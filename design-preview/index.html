@@ -1,0 +1,1373 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ISX Leave Management — design preview</title><style>/* ==========================================================================
+   ISX Leave Management Dashboard — design system
+   --------------------------------------------------------------------------
+   A single, hand-authored stylesheet: design tokens, then primitives, then
+   the few composite pieces (calendar, tables, shell). No build step, no
+   utility-class soup in the markup — the JSX stays readable and the visual
+   language stays consistent.
+
+   Layout is desktop-first with mobile breakpoints at the bottom of each
+   section. Tables collapse into cards under 720px.
+   ========================================================================== */
+
+/* ---------------------------------------------------------------- tokens */
+:root {
+  /* Neutrals — a slightly cool grey ramp */
+  --c-bg:            #f6f7f9;
+  --c-surface:       #ffffff;
+  --c-surface-sunk:  #fafbfc;
+  --c-border:        #e4e7ec;
+  --c-border-strong: #d0d5dd;
+
+  --c-ink:        #101828;
+  --c-ink-2:      #344054;
+  --c-ink-3:      #667085;
+  --c-ink-4:      #98a2b3;
+
+  /* Brand */
+  --c-brand:       #3538cd;
+  --c-brand-hover: #2d2fa8;
+  --c-brand-soft:  #eef0ff;
+  --c-brand-ink:   #2d31a6;
+
+  /* Status */
+  --c-ok:        #067647;
+  --c-ok-soft:   #ecfdf3;
+  --c-ok-border: #abefc6;
+
+  --c-warn:        #b54708;
+  --c-warn-soft:   #fffaeb;
+  --c-warn-border: #fedf89;
+
+  --c-bad:        #b42318;
+  --c-bad-soft:   #fef3f2;
+  --c-bad-border: #fecdca;
+
+  --c-info:        #175cd3;
+  --c-info-soft:   #eff8ff;
+  --c-info-border: #b2ddff;
+
+  --c-mute:        #475467;
+  --c-mute-soft:   #f2f4f7;
+  --c-mute-border: #e4e7ec;
+
+  /* Calendar legend */
+  --cal-office:   #eff4ff;
+  --cal-office-b: #b8c9ff;
+  --cal-approved: #e7f7ee;
+  --cal-pending:  #fff5e0;
+  --cal-holiday:  #fdecea;
+
+  /* Shape & depth */
+  --r-sm: 6px;
+  --r:    10px;
+  --r-lg: 14px;
+  --r-xl: 18px;
+
+  --sh-sm: 0 1px 2px rgba(16, 24, 40, .06);
+  --sh:    0 1px 3px rgba(16, 24, 40, .08), 0 1px 2px rgba(16, 24, 40, .04);
+  --sh-lg: 0 12px 32px -8px rgba(16, 24, 40, .18), 0 4px 8px -4px rgba(16, 24, 40, .06);
+
+  --sidebar-w: 244px;
+  --font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, "Noto Sans Thai", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+}
+
+/* ------------------------------------------------------------------ base */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body { padding: 0; margin: 0; }
+
+body {
+  font-family: var(--font);
+  background: var(--c-bg);
+  color: var(--c-ink);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: -0.011em; color: var(--c-ink); }
+h1 { font-size: 24px; line-height: 1.25; letter-spacing: -0.02em; }
+h2 { font-size: 17px; line-height: 1.35; }
+h3 { font-size: 15px; }
+p  { margin: 0; }
+a  { color: inherit; text-decoration: none; }
+
+:focus-visible {
+  outline: 2px solid var(--c-brand);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+.muted     { color: var(--c-ink-3); }
+.muted-sm  { color: var(--c-ink-3); font-size: 13px; }
+.tiny      { font-size: 12px; color: var(--c-ink-3); }
+.nowrap    { white-space: nowrap; }
+.num       { font-variant-numeric: tabular-nums; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* --------------------------------------------------------------- layout */
+.shell { display: flex; min-height: 100vh; }
+
+.sidebar {
+  width: var(--sidebar-w);
+  flex: 0 0 var(--sidebar-w);
+  background: var(--c-surface);
+  border-right: 1px solid var(--c-border);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.brand {
+  display: flex; align-items: center; gap: 10px;
+  padding: 20px 18px 18px;
+}
+.brand-mark {
+  width: 30px; height: 30px; border-radius: 8px;
+  background: linear-gradient(140deg, var(--c-brand), #6366f1);
+  color: #fff; font-weight: 700; font-size: 12px; letter-spacing: .02em;
+  display: grid; place-items: center;
+  box-shadow: var(--sh-sm);
+}
+.brand-text   { display: flex; flex-direction: column; line-height: 1.2; }
+.brand-name   { font-weight: 650; font-size: 14px; }
+.brand-sub    { font-size: 11px; color: var(--c-ink-4); }
+
+.nav { padding: 4px 12px; display: flex; flex-direction: column; gap: 2px; flex: 1; overflow-y: auto; }
+.nav-label {
+  font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--c-ink-4); padding: 16px 8px 6px;
+}
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: var(--r-sm);
+  color: var(--c-ink-2); font-size: 13.5px; font-weight: 500;
+}
+.nav-item:hover { background: var(--c-mute-soft); color: var(--c-ink); }
+.nav-item[aria-current="page"] { background: var(--c-brand-soft); color: var(--c-brand-ink); font-weight: 600; }
+.nav-item .ico { width: 16px; height: 16px; flex: 0 0 16px; opacity: .85; }
+.nav-item .count {
+  margin-left: auto; font-size: 11px; font-weight: 650;
+  background: var(--c-bad-soft); color: var(--c-bad);
+  border-radius: 999px; padding: 1px 7px;
+}
+
+.sidebar-foot { border-top: 1px solid var(--c-border); padding: 12px; }
+
+.userbox { display: flex; align-items: center; gap: 10px; padding: 6px 4px; }
+.avatar {
+  width: 32px; height: 32px; border-radius: 999px; flex: 0 0 32px;
+  background: var(--c-brand-soft); color: var(--c-brand-ink);
+  display: grid; place-items: center; font-weight: 650; font-size: 12px;
+}
+.userbox-meta { min-width: 0; line-height: 1.25; }
+.userbox-name { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.userbox-role { font-size: 11px; color: var(--c-ink-4); }
+
+.main   { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.topbar {
+  display: flex; align-items: center; gap: 14px;
+  padding: 0 28px; height: 60px;
+  background: rgba(255,255,255,.85);
+  backdrop-filter: saturate(180%) blur(8px);
+  border-bottom: 1px solid var(--c-border);
+  position: sticky; top: 0; z-index: 20;
+}
+.topbar h1 { font-size: 17px; font-weight: 600; }
+.topbar-spacer { flex: 1; }
+.content { padding: 24px 28px 56px; max-width: 1240px; width: 100%; }
+
+.page-head { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 20px; }
+.page-head .grow { flex: 1; min-width: 0; }
+.page-head h1 + p { margin-top: 4px; }
+
+.section { margin-top: 26px; }
+.section-head {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+}
+.section-head h2 { flex: 1; }
+
+.stack   { display: flex; flex-direction: column; gap: 14px; }
+.row     { display: flex; align-items: center; gap: 10px; }
+.row-wrap{ display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.grid-2  { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+
+/* ---------------------------------------------------------------- cards */
+.card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-sm);
+}
+.card-head {
+  padding: 15px 18px; border-bottom: 1px solid var(--c-border);
+  display: flex; align-items: center; gap: 12px;
+}
+.card-head h2 { flex: 1; }
+.card-body  { padding: 18px; }
+.card-body.tight { padding: 12px; }
+.card-body.flush { padding: 0; }
+.card-foot {
+  padding: 12px 18px; border-top: 1px solid var(--c-border);
+  background: var(--c-surface-sunk);
+  border-radius: 0 0 var(--r-lg) var(--r-lg);
+}
+
+/* ------------------------------------------------------------- KPI cards */
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.kpis.k3 { grid-template-columns: repeat(3, 1fr); }
+
+.kpi {
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  padding: 16px 18px;
+  box-shadow: var(--sh-sm);
+  display: flex; flex-direction: column; gap: 6px;
+  min-height: 104px;
+}
+.kpi-label {
+  font-size: 12px; font-weight: 600; letter-spacing: .02em;
+  color: var(--c-ink-3); text-transform: uppercase;
+}
+.kpi-value {
+  font-size: 30px; font-weight: 650; letter-spacing: -0.03em;
+  line-height: 1.1; font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.kpi-value .unit { font-size: 14px; font-weight: 500; color: var(--c-ink-3); margin-left: 4px; letter-spacing: 0; }
+.kpi-value.sm  { font-size: 20px; letter-spacing: -0.02em; }
+.kpi-sub  { font-size: 12.5px; color: var(--c-ink-3); margin-top: auto; }
+.kpi.accent  { background: linear-gradient(180deg, #fbfbff, #fff); border-color: #dcdffb; }
+.kpi.accent .kpi-value { color: var(--c-brand-ink); }
+.kpi.warn .kpi-value   { color: var(--c-warn); }
+
+.meter { height: 6px; border-radius: 999px; background: var(--c-mute-soft); overflow: hidden; margin-top: auto; }
+.meter > span { display: block; height: 100%; background: var(--c-brand); border-radius: 999px; }
+.meter.low > span { background: var(--c-warn); }
+
+/* --------------------------------------------------------------- badges */
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 9px 2px 7px;
+  border-radius: 999px;
+  font-size: 12px; font-weight: 550; line-height: 20px;
+  border: 1px solid transparent; white-space: nowrap;
+}
+.badge::before { content: ""; width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
+.badge.plain::before { display: none; }
+.badge-approved  { background: var(--c-ok-soft);   color: var(--c-ok);   border-color: var(--c-ok-border); }
+.badge-pending   { background: var(--c-warn-soft); color: var(--c-warn); border-color: var(--c-warn-border); }
+.badge-rejected  { background: var(--c-bad-soft);  color: var(--c-bad);  border-color: var(--c-bad-border); }
+.badge-cancelled { background: var(--c-mute-soft); color: var(--c-mute); border-color: var(--c-mute-border); }
+.badge-info      { background: var(--c-info-soft); color: var(--c-info); border-color: var(--c-info-border); }
+.badge-brand     { background: var(--c-brand-soft);color: var(--c-brand-ink); border-color: #d5d9fb; }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 9px; border-radius: var(--r-sm);
+  background: var(--c-mute-soft); color: var(--c-ink-2);
+  font-size: 12px; font-weight: 500;
+}
+
+/* -------------------------------------------------------------- buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  height: 36px; padding: 0 14px;
+  border-radius: var(--r-sm); border: 1px solid var(--c-border-strong);
+  background: var(--c-surface); color: var(--c-ink-2);
+  font-family: inherit; font-size: 13.5px; font-weight: 550;
+  cursor: pointer; box-shadow: var(--sh-sm);
+  transition: background .12s ease, border-color .12s ease, color .12s ease;
+}
+.btn:hover:not(:disabled) { background: var(--c-surface-sunk); border-color: var(--c-ink-4); }
+.btn:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
+
+.btn-primary { background: var(--c-brand); border-color: var(--c-brand); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: var(--c-brand-hover); border-color: var(--c-brand-hover); }
+
+.btn-ok  { background: var(--c-ok); border-color: var(--c-ok); color: #fff; }
+.btn-ok:hover:not(:disabled) { background: #05603a; border-color: #05603a; }
+
+.btn-danger { background: var(--c-surface); border-color: var(--c-bad-border); color: var(--c-bad); }
+.btn-danger:hover:not(:disabled) { background: var(--c-bad-soft); border-color: var(--c-bad); }
+
+.btn-ghost { background: transparent; border-color: transparent; box-shadow: none; }
+.btn-ghost:hover:not(:disabled) { background: var(--c-mute-soft); border-color: transparent; }
+
+.btn-sm { height: 30px; padding: 0 10px; font-size: 12.5px; }
+.btn-lg { height: 42px; padding: 0 18px; font-size: 14.5px; }
+.btn-block { width: 100%; }
+
+/* --------------------------------------------------------------- forms */
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field > label { font-size: 13px; font-weight: 600; color: var(--c-ink-2); }
+.field .hint  { font-size: 12px; color: var(--c-ink-3); }
+.field .err   { font-size: 12px; color: var(--c-bad); font-weight: 500; }
+
+.input, .select, .textarea {
+  width: 100%; font-family: inherit; font-size: 14px; color: var(--c-ink);
+  background: var(--c-surface);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--r-sm);
+  padding: 0 11px; height: 38px;
+  box-shadow: var(--sh-sm);
+  transition: border-color .12s ease, box-shadow .12s ease;
+}
+.textarea { height: auto; padding: 9px 11px; min-height: 84px; resize: vertical; line-height: 1.5; }
+.select { appearance: none; padding-right: 32px;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23667085' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center;
+}
+.input:focus, .select:focus, .textarea:focus {
+  outline: none; border-color: var(--c-brand);
+  box-shadow: 0 0 0 3px rgba(53, 56, 205, .12);
+}
+.input[aria-invalid="true"], .textarea[aria-invalid="true"] { border-color: var(--c-bad); }
+.input:disabled, .select:disabled { background: var(--c-mute-soft); color: var(--c-ink-3); }
+
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.form-grid .full { grid-column: 1 / -1; }
+
+.check { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; padding: 9px 11px;
+  border: 1px solid var(--c-border); border-radius: var(--r-sm); background: var(--c-surface); }
+.check:hover { background: var(--c-surface-sunk); }
+.check input { width: 16px; height: 16px; margin: 2px 0 0; accent-color: var(--c-brand); cursor: pointer; }
+.check-body { line-height: 1.35; }
+.check-title { font-size: 13.5px; font-weight: 550; }
+.check.on { border-color: #c7ccfb; background: var(--c-brand-soft); }
+
+/* --------------------------------------------------------------- tables */
+.table-wrap { overflow-x: auto; }
+table.tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+table.tbl th {
+  text-align: left; font-size: 11.5px; font-weight: 650; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--c-ink-3);
+  padding: 10px 16px; background: var(--c-surface-sunk);
+  border-bottom: 1px solid var(--c-border); white-space: nowrap;
+}
+table.tbl td { padding: 12px 16px; border-bottom: 1px solid var(--c-border); vertical-align: middle; }
+table.tbl tbody tr:last-child td { border-bottom: none; }
+table.tbl tbody tr:hover { background: var(--c-surface-sunk); }
+table.tbl td.r, table.tbl th.r { text-align: right; }
+table.tbl .primary { font-weight: 600; color: var(--c-ink); }
+table.tbl .actions { display: flex; gap: 6px; justify-content: flex-end; }
+
+.person { display: flex; align-items: center; gap: 10px; }
+.person .avatar { width: 28px; height: 28px; flex: 0 0 28px; font-size: 11px; }
+.person-name { font-weight: 600; }
+.person-mail { font-size: 12px; color: var(--c-ink-3); }
+
+/* ---------------------------------------------------------- empty state */
+.empty { text-align: center; padding: 44px 24px; }
+.empty-ico {
+  width: 42px; height: 42px; border-radius: var(--r); margin: 0 auto 12px;
+  background: var(--c-mute-soft); color: var(--c-ink-4); display: grid; place-items: center;
+}
+.empty h3 { font-size: 14.5px; margin-bottom: 4px; }
+.empty p  { font-size: 13px; color: var(--c-ink-3); max-width: 340px; margin: 0 auto; }
+.empty .btn { margin-top: 14px; }
+
+/* -------------------------------------------------------------- calendar */
+.cal-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.cal-title { font-size: 15px; font-weight: 650; min-width: 168px; }
+
+.cal { border: 1px solid var(--c-border); border-radius: var(--r); overflow: hidden; background: var(--c-border); }
+/* minmax(0,1fr) rather than 1fr: without it a long holiday name would blow
+   out its column and the seven days would stop being equal width. */
+.cal-dow, .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 1px; }
+.cal-dow { background: var(--c-border); }
+.cal-dow > div {
+  background: var(--c-surface-sunk); padding: 8px 6px; text-align: center;
+  font-size: 11px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase; color: var(--c-ink-3);
+}
+.cal-grid { background: var(--c-border); }
+
+.cal-cell {
+  background: var(--c-surface); min-height: 92px; padding: 7px 8px 8px;
+  display: flex; flex-direction: column; gap: 4px; position: relative;
+  min-width: 0; overflow: hidden;
+}
+.cal-cell.out { background: var(--c-surface-sunk); }
+.cal-cell.out .cal-num { color: var(--c-ink-4); }
+.cal-cell.office  { background: var(--cal-office); }
+.cal-cell.holiday { background: var(--cal-holiday); }
+.cal-num { font-size: 12.5px; font-weight: 600; color: var(--c-ink-2);
+  font-variant-numeric: tabular-nums; padding-right: 12px; }
+.cal-cell.today .cal-num {
+  background: var(--c-brand); color: #fff; border-radius: 999px;
+  width: 22px; height: 22px; display: grid; place-items: center; margin: -2px 0 0 -3px;
+}
+.cal-tag {
+  font-size: 10.5px; font-weight: 600; line-height: 1.25;
+  border-radius: 4px; padding: 2px 5px; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cal-tag.hol      { background: #fde3e0; color: #91201a; }
+.cal-tag.approved { background: #cff0dd; color: #05603a; }
+.cal-tag.pending  { background: #fdeec6; color: #93370d; }
+.cal-tag.more     { background: transparent; color: var(--c-ink-3); font-weight: 500; padding-left: 2px; }
+.cal-office-dot {
+  position: absolute; top: 8px; right: 8px;
+  width: 6px; height: 6px; border-radius: 999px; background: #7b93f5;
+}
+
+.legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; }
+.legend-item { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--c-ink-2); }
+.legend-swatch { width: 13px; height: 13px; border-radius: 4px; border: 1px solid var(--c-border-strong); }
+
+/* ------------------------------------------------------------ breakdown */
+.breakdown { background: var(--c-surface-sunk); border: 1px solid var(--c-border); border-radius: var(--r); }
+.breakdown-row {
+  display: flex; align-items: baseline; gap: 12px;
+  padding: 8px 14px; font-size: 13px; border-bottom: 1px dashed var(--c-border);
+}
+.breakdown-row:last-child { border-bottom: none; }
+.breakdown-row .lbl { flex: 1; color: var(--c-ink-2); }
+.breakdown-row .val { font-weight: 600; font-variant-numeric: tabular-nums; }
+.breakdown-row.total { background: var(--c-brand-soft); border-radius: 0 0 var(--r) var(--r); }
+.breakdown-row.total .lbl { color: var(--c-brand-ink); font-weight: 600; }
+.breakdown-row.total .val { color: var(--c-brand-ink); font-size: 15px; }
+.breakdown-note { font-size: 12px; color: var(--c-ink-3); padding: 2px 14px 10px; }
+
+/* --------------------------------------------------------------- alerts */
+.alert {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 11px 14px; border-radius: var(--r); font-size: 13px;
+  border: 1px solid; line-height: 1.45;
+}
+.alert-error { background: var(--c-bad-soft);  border-color: var(--c-bad-border);  color: #7a271a; }
+.alert-warn  { background: var(--c-warn-soft); border-color: var(--c-warn-border); color: #7a2e0e; }
+.alert-info  { background: var(--c-info-soft); border-color: var(--c-info-border); color: #194185; }
+.alert-ok    { background: var(--c-ok-soft);   border-color: var(--c-ok-border);   color: #054f31; }
+.alert b { font-weight: 650; }
+
+/* -------------------------------------------------------- dialog / modal */
+.backdrop {
+  position: fixed; inset: 0; background: rgba(16, 24, 40, .45);
+  display: grid; place-items: center; padding: 20px; z-index: 60;
+}
+.dialog {
+  background: var(--c-surface); border-radius: var(--r-xl); box-shadow: var(--sh-lg);
+  width: 100%; max-width: 460px; overflow: hidden;
+}
+.dialog.wide { max-width: 620px; }
+.dialog-head { padding: 20px 22px 0; }
+.dialog-head h2 { font-size: 17px; }
+.dialog-head p  { margin-top: 6px; color: var(--c-ink-3); font-size: 13.5px; }
+.dialog-body { padding: 16px 22px; }
+.dialog-foot {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding: 14px 22px; background: var(--c-surface-sunk); border-top: 1px solid var(--c-border);
+}
+
+/* --------------------------------------------------------------- toasts */
+.toasts {
+  position: fixed; right: 20px; bottom: 20px; z-index: 80;
+  display: flex; flex-direction: column; gap: 8px; max-width: 360px;
+}
+.toast {
+  display: flex; gap: 10px; align-items: flex-start;
+  background: var(--c-ink); color: #fff;
+  border-radius: var(--r); padding: 11px 14px; font-size: 13px;
+  box-shadow: var(--sh-lg);
+}
+.toast.ok  { background: #05603a; }
+.toast.err { background: #912018; }
+.toast .x  { margin-left: auto; opacity: .7; cursor: pointer; background: none; border: 0; color: inherit; font-size: 15px; line-height: 1; }
+
+/* ---------------------------------------------------------------- login */
+.auth-wrap { min-height: 100vh; display: grid; grid-template-columns: 1fr 1fr; }
+.auth-side {
+  background: linear-gradient(155deg, #23257f 0%, #3538cd 55%, #5b5ee0 100%);
+  color: #fff; padding: 48px; display: flex; flex-direction: column; justify-content: space-between;
+}
+.auth-side h2 { color: #fff; font-size: 30px; letter-spacing: -0.025em; line-height: 1.2; max-width: 15ch; }
+.auth-side p  { color: rgba(255,255,255,.75); margin-top: 14px; max-width: 40ch; font-size: 14.5px; }
+.auth-points { display: flex; flex-direction: column; gap: 12px; margin-top: 28px; }
+.auth-point { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; color: rgba(255,255,255,.9); }
+.auth-point .tick {
+  width: 18px; height: 18px; border-radius: 999px; flex: 0 0 18px; margin-top: 1px;
+  background: rgba(255,255,255,.18); display: grid; place-items: center; font-size: 10px;
+}
+.auth-main { display: grid; place-items: center; padding: 40px 24px; }
+.auth-card { width: 100%; max-width: 372px; }
+.auth-card h1 { font-size: 22px; margin-bottom: 6px; }
+
+.demo-users { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.demo-user {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 8px 10px; border: 1px solid var(--c-border); border-radius: var(--r-sm);
+  background: var(--c-surface); cursor: pointer; font-family: inherit;
+}
+.demo-user:hover { background: var(--c-surface-sunk); border-color: var(--c-border-strong); }
+.demo-user .avatar { width: 26px; height: 26px; flex: 0 0 26px; font-size: 10px; }
+
+/* ------------------------------------------------------------ utilities */
+.divider { height: 1px; background: var(--c-border); margin: 18px 0; }
+.spread  { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.mt-0 { margin-top: 0; } .mt-8 { margin-top: 8px; } .mt-16 { margin-top: 16px; } .mt-24 { margin-top: 24px; }
+.dl { display: grid; grid-template-columns: 132px 1fr; gap: 10px 16px; font-size: 13.5px; }
+.dl dt { color: var(--c-ink-3); }
+.dl dd { margin: 0; font-weight: 550; }
+
+/* ---------------------------------------------------------- responsive */
+@media (max-width: 1080px) {
+  .kpis { grid-template-columns: repeat(2, 1fr); }
+  .grid-2 { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 860px) {
+  .auth-wrap { grid-template-columns: 1fr; }
+  .auth-side { display: none; }
+}
+
+@media (max-width: 820px) {
+  .shell { flex-direction: column; }
+  .sidebar {
+    width: 100%; flex: none; height: auto; position: sticky; top: 0; z-index: 30;
+    border-right: none; border-bottom: 1px solid var(--c-border);
+  }
+  .brand { padding: 12px 16px; }
+  .nav {
+    flex-direction: row; overflow-x: auto; padding: 0 10px 8px; gap: 4px;
+    scrollbar-width: none;
+  }
+  .nav::-webkit-scrollbar { display: none; }
+  .nav-label, .sidebar-foot { display: none; }
+  .nav-item { white-space: nowrap; }
+  .topbar  { padding: 0 16px; height: 54px; }
+  .content { padding: 18px 16px 48px; }
+}
+
+@media (max-width: 720px) {
+  .kpis, .kpis.k3 { grid-template-columns: 1fr 1fr; }
+  .form-grid { grid-template-columns: 1fr; }
+
+  /* Tables become stacked cards (§24) */
+  table.tbl, table.tbl tbody, table.tbl tr, table.tbl td { display: block; width: 100%; }
+  table.tbl thead { display: none; }
+  table.tbl tr {
+    border: 1px solid var(--c-border); border-radius: var(--r); margin: 10px;
+    background: var(--c-surface); padding: 4px 0;
+  }
+  table.tbl td {
+    display: flex; align-items: center; gap: 12px;
+    border-bottom: 1px dashed var(--c-border); padding: 9px 14px;
+  }
+  table.tbl td:last-child { border-bottom: none; }
+  table.tbl td::before {
+    content: attr(data-label); flex: 0 0 108px;
+    font-size: 11.5px; font-weight: 650; text-transform: uppercase;
+    letter-spacing: .04em; color: var(--c-ink-3);
+  }
+  table.tbl td.r { text-align: left; }
+  table.tbl .actions { justify-content: flex-start; }
+  .cal-cell { min-height: 62px; padding: 5px; }
+  .cal-tag  { font-size: 9.5px; padding: 1px 3px; }
+  .dl { grid-template-columns: 1fr; gap: 2px 0; }
+  .dl dd { margin-bottom: 10px; }
+}
+
+@media (max-width: 420px) {
+  .kpis, .kpis.k3 { grid-template-columns: 1fr; }
+}
+
+.pv-bar{position:sticky;top:0;z-index:200;display:flex;gap:6px;flex-wrap:wrap;align-items:center;
+ padding:10px 16px;background:#101828;color:#fff;box-shadow:var(--sh)}
+.pv-bar .t{font-weight:650;font-size:13px;margin-right:8px}
+.pv-bar button{font-family:inherit;font-size:12.5px;font-weight:550;padding:5px 10px;border-radius:6px;
+ border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.06);color:#fff;cursor:pointer}
+.pv-bar button:hover{background:rgba(255,255,255,.14)}
+.pv-bar button[aria-pressed="true"]{background:#fff;color:#101828;border-color:#fff}
+.pv-note{padding:8px 16px;background:#fffaeb;border-bottom:1px solid #fedf89;color:#7a2e0e;font-size:12.5px}
+.pv-screen{display:none}.pv-screen.on{display:block}
+</style></head><body style="background:var(--c-bg)">
+<div class="pv-bar"><span class="t">ISX Leave — design preview</span>
+<button data-s="login" aria-pressed="true">Sign in</button><button data-s="employee-dashboard" aria-pressed="false">Employee · Dashboard</button><button data-s="request" aria-pressed="false">Employee · Request leave</button><button data-s="admin-dashboard" aria-pressed="false">Admin · Dashboard</button><button data-s="admin-calendar" aria-pressed="false">Admin · Company calendar</button><button data-s="admin-settings" aria-pressed="false">Admin · Settings</button><button data-s="admin-audit" aria-pressed="false">Admin · Audit log</button></div>
+<div class="pv-note">Static snapshot rendered from the application's own stylesheet and the seeded demo database (14 Aug 2026). Buttons and forms are inert here — run <code>npm run dev</code> for the working app.</div>
+<div class="pv-screen on" id="s-login"><div class="auth-wrap">
+<div class="auth-side">
+ <div class="row" style="gap:10px"><div class="brand-mark" style="width:34px;height:34px">ISX</div>
+ <div><div style="font-weight:650">ISX Leave</div><div style="font-size:12px;opacity:.7">Internal HR system</div></div></div>
+ <div><h2>Time off, without the spreadsheet.</h2>
+ <p>Request leave, watch it move through approval, and always know exactly how many days you have left — counted against the days ISX actually works.</p>
+ <div class="auth-points"><div class="auth-point"><span class="tick">✓</span>Only office working days are deducted</div><div class="auth-point"><span class="tick">✓</span>Bank of Thailand public holidays are never charged to you</div><div class="auth-point"><span class="tick">✓</span>Your leave is private — colleagues can't see it</div></div></div>
+ <div style="font-size:12px;opacity:.6">© 2026 ISX Company</div></div>
+<div class="auth-main"><div class="auth-card">
+ <h1>Sign in</h1><p class="muted-sm" style="margin-bottom:20px">Use your ISX work email address.</p>
+ <form class="stack">
+  <div class="field"><label>Email address</label><input class="input" placeholder="you@isx.co.th"></div>
+  <div class="field"><label>Password</label><input class="input" type="password" placeholder="••••••••"></div>
+  <button class="btn btn-primary btn-lg btn-block">Sign in</button></form>
+ <div class="divider"></div>
+ <div class="tiny" style="font-weight:650;margin-bottom:2px">Demo accounts</div>
+ <p class="tiny">One click to sign in. Disabled automatically in production.</p>
+ <div class="demo-users"><button class="demo-user"><div class="avatar ">SW</div><span><span style="display:block;font-size:13px;font-weight:600">Somchai Wattana</span><span class="tiny">Admin · HR & Operations</span></span></button><button class="demo-user"><div class="avatar ">JM</div><span><span style="display:block;font-size:13px;font-weight:600">Jane Mitchell</span><span class="tiny">Employee · 15 days</span></span></button><button class="demo-user"><div class="avatar ">JP</div><span><span style="display:block;font-size:13px;font-weight:600">John Prasert</span><span class="tiny">Employee · 20 days</span></span></button><button class="demo-user"><div class="avatar ">MC</div><span><span style="display:block;font-size:13px;font-weight:600">Mike Chen</span><span class="tiny">Employee · 12 days</span></span></button></div>
+</div></div></div></div><div class="pv-screen " id="s-employee-dashboard"><div class="shell">
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark">ISX</div><div class="brand-text"><span class="brand-name">Leave</span><span class="brand-sub">ISX Company</span></div></div>
+    <nav class="nav"><div class="nav-label">My leave</div><a class="nav-item" href="#" aria-current="page"><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg></span><span>Dashboard</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg></span><span>My leave</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span><span>Calendar</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span><span>Request leave</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg></span><span>Profile</span></a></nav>
+    <div class="sidebar-foot"><div class="userbox"><div class="avatar ">JM</div>
+      <div class="userbox-meta"><div class="userbox-name">Jane Mitchell</div><div class="userbox-role">Employee</div></div>
+      <button class="btn btn-ghost btn-sm" style="margin-left:auto" title="Sign out"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2"/><path d="M10 12h11m0 0-3-3m3 3-3 3"/></svg></button></div></div>
+  </aside>
+  <div class="main">
+    <header class="topbar"><h1>Dashboard</h1><div class="topbar-spacer"></div>
+      <button class="btn btn-ghost" style="position:relative"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 1 1 12 0c0 4.5 1.5 6 1.5 6h-15S6 13.5 6 9z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>
+      <span style="position:absolute;top:4px;right:5px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--c-bad);color:#fff;font-size:10px;font-weight:700;display:grid;place-items:center">2</span></button>
+    </header>
+    <div class="content">
+<div class="page-head"><div class="grow"><h1>Good afternoon, Jane</h1>
+  <p class="muted">ISX office days are <b>Monday + Tuesday</b>. Only those days count against your leave.</p></div>
+  <a class="btn btn-primary" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Request leave</a></div>
+<div class="kpis">
+  <div class="kpi "><div class="kpi-label">Annual entitlement</div>
+  <div class="kpi-value ">15<span class="unit">days</span></div>
+  
+  <div class="kpi-sub">For 2026</div></div>
+  <div class="kpi "><div class="kpi-label">Used</div>
+  <div class="kpi-value ">6<span class="unit">days</span></div>
+  <div class="meter "><span style="width:40%"></span></div>
+  <div class="kpi-sub">1 more awaiting approval</div></div>
+  <div class="kpi accent"><div class="kpi-label">Remaining</div>
+  <div class="kpi-value ">9<span class="unit">days</span></div>
+  
+  <div class="kpi-sub">8 available once pending is counted</div></div>
+  <div class="kpi "><div class="kpi-label">Next leave</div>
+  <div class="kpi-value sm">18–22 Sep 2026</div>
+  
+  <div class="kpi-sub">Annual Leave · 2 days · in 1 month</div></div>
+</div>
+<div class="section grid-2">
+  <div class="card"><div class="card-head"><div style="flex:1"><h2>This month</h2><p class="muted-sm" style="margin-top:2px">Your leave, ISX office days and Thai public holidays.</p></div></div>
+    <div class="card-body"><div><div class="cal-head"><div class="cal-title">August 2026</div>
+    <div class="row" style="margin-left:auto;gap:6px">
+      <button class="btn btn-sm">&lsaquo;</button><button class="btn btn-sm">Today</button><button class="btn btn-sm">&rsaquo;</button></div></div>
+    <div class="cal"><div class="cal-dow"><div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div></div>
+    <div class="cal-grid"><div class="cal-cell out"><div class="cal-num">26</div>
+      
+      
+      
+      </div><div class="cal-cell out office"><div class="cal-num">27</div>
+      <span class="cal-office-dot" title="Office day"></span>
+      
+      
+      </div><div class="cal-cell out holiday"><div class="cal-num">28</div>
+      
+      <div class="cal-tag hol" title="H.M. King Maha Vajiralongkorn Phra Vajiraklaochaoyuhua's Birthday (BOT)">H.M. King Maha Vajiralongkorn Phra Vajiraklaochaoyuhua's Birthday</div>
+      
+      </div><div class="cal-cell out holiday"><div class="cal-num">29</div>
+      
+      <div class="cal-tag hol" title="Asarnha Bucha Day (BOT)">Asarnha Bucha Day</div>
+      
+      </div><div class="cal-cell out"><div class="cal-num">30</div>
+      
+      
+      
+      </div><div class="cal-cell out"><div class="cal-num">31</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">1</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">2</div>
+      
+      
+      
+      </div><div class="cal-cell office"><div class="cal-num">3</div>
+      <span class="cal-office-dot" title="Office day"></span>
+      
+      
+      </div><div class="cal-cell office"><div class="cal-num">4</div>
+      <span class="cal-office-dot" title="Office day"></span>
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">5</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">6</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">7</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">8</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">9</div>
+      
+      
+      
+      </div><div class="cal-cell office"><div class="cal-num">10</div>
+      <span class="cal-office-dot" title="Office day"></span>
+      
+      
+      </div><div class="cal-cell office"><div class="cal-num">11</div>
+      <span class="cal-office-dot" title="Office day"></span>
+      
+      
+      </div><div class="cal-cell holiday"><div class="cal-num">12</div>
+      
+      <div class="cal-tag hol" title="H.M. Queen Sirikit The Queen Mother's Birthday and Mother's Day (BOT)">H.M. Queen Sirikit The Queen Mother's Birthday and Mother's Day</div>
+      
+      </div><div class="cal-cell"><div class="cal-num">13</div>
+      
+      
+      
+      </div><div class="cal-cell today"><div class="cal-num">14</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">15</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">16</div>
+      
+      
+      
+      </div><div class="cal-cell office"><div class="cal-num">17</div>
+      <span class="cal-office-dot" title="Office day"></span>
+      
+      
+      </div><div class="cal-cell office"><div class="cal-num">18</div>
+      <span class="cal-office-dot" title="Office day"></span>
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">19</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">20</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">21</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">22</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">23</div>
+      
+      
+      
+      </div><div class="cal-cell office"><div class="cal-num">24</div>
+      <span class="cal-office-dot" title="Office day"></span>
+      
+      
+      </div><div class="cal-cell office"><div class="cal-num">25</div>
+      <span class="cal-office-dot" title="Office day"></span>
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">26</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">27</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">28</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">29</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">30</div>
+      
+      
+      
+      </div><div class="cal-cell office"><div class="cal-num">31</div>
+      <span class="cal-office-dot" title="Office day"></span>
+      
+      
+      </div><div class="cal-cell out office"><div class="cal-num">1</div>
+      <span class="cal-office-dot" title="Office day"></span>
+      
+      
+      </div><div class="cal-cell out"><div class="cal-num">2</div>
+      
+      
+      
+      </div><div class="cal-cell out"><div class="cal-num">3</div>
+      
+      
+      
+      </div><div class="cal-cell out"><div class="cal-num">4</div>
+      
+      
+      
+      </div><div class="cal-cell out"><div class="cal-num">5</div>
+      
+      
+      
+      </div></div></div>
+    <div class="legend"><span class="legend-item"><span class="legend-swatch" style="background:var(--cal-office)"></span>Office day</span><span class="legend-item"><span class="legend-swatch" style="background:var(--cal-approved)"></span>Approved leave</span><span class="legend-item"><span class="legend-swatch" style="background:var(--cal-pending)"></span>Pending leave</span><span class="legend-item"><span class="legend-swatch" style="background:var(--cal-holiday)"></span>Public holiday</span><span class="legend-item"><span class="legend-swatch" style="background:var(--c-surface)"></span>Non-office day</span></div></div></div></div>
+  <div class="stack">
+    <div class="card"><div class="card-head"><h2>Upcoming leave</h2></div><div class="card-body">
+      <div style="font-size:18px;font-weight:650;letter-spacing:-.02em">18–22 Sep 2026</div>
+      <div class="row" style="margin-top:8px;gap:8px"><span class="badge badge-approved">Approved</span><span class="chip">Annual Leave</span><span class="chip">2 days</span></div>
+      <p class="muted-sm mt-16">Starts in 1 month.</p></div></div>
+    <div class="card"><div class="card-head"><h2>Leave types</h2></div><div class="card-body stack" style="gap:10px">
+      <div><div style="font-size:13px;font-weight:600">Annual Leave</div><div class="tiny">Paid time off from the yearly entitlement.</div></div><div><div style="font-size:13px;font-weight:600">Personal Leave</div><div class="tiny">Personal business (Thai: ลากิจ).</div></div><div><div style="font-size:13px;font-weight:600">Sick Leave</div><div class="tiny">Illness. Medical certificate may be requested.</div></div><div><div style="font-size:13px;font-weight:600">Other</div><div class="tiny">Anything not covered above — explain in the reason.</div></div>
+    </div></div>
+  </div></div>
+<div class="section"><div class="card"><div class="card-head"><div style="flex:1"><h2>Recent leave requests</h2></div><a class="btn btn-sm" href="#">View all</a></div>
+<div class="card-body flush"><div class="table-wrap"><table class="tbl">
+<thead><tr><th>Date</th><th>Leave type</th><th class="r">Days</th><th>Status</th><th>Submitted</th><th class="r">Action</th></tr></thead>
+<tbody><tr>
+  <td data-label="Date" class="primary nowrap">12–13 Oct 2026</td>
+  <td data-label="Leave type">Personal Leave</td>
+  <td data-label="Days" class="r num">1</td><td data-label="Status"><span class="badge badge-pending">Pending</span></td>
+  <td data-label="Submitted" class="muted-sm nowrap">14 Aug 2026</td>
+  <td data-label="Action" class="r"><div class="actions"><button class="btn btn-sm">Cancel</button></div></td></tr><tr>
+  <td data-label="Date" class="primary nowrap">18–22 Sep 2026</td>
+  <td data-label="Leave type">Annual Leave</td>
+  <td data-label="Days" class="r num">2</td><td data-label="Status"><span class="badge badge-approved">Approved</span></td>
+  <td data-label="Submitted" class="muted-sm nowrap">14 Aug 2026</td>
+  <td data-label="Action" class="r"><div class="actions"><span class="tiny">—</span></div></td></tr><tr>
+  <td data-label="Date" class="primary nowrap">27–29 Jul 2026</td>
+  <td data-label="Leave type">Annual Leave<div class="tiny" style="margin-top:2px">Reason: Client shoot scheduled that Monday — please re-submit for a later week.</div></td>
+  <td data-label="Days" class="r num">1</td><td data-label="Status"><span class="badge badge-rejected">Rejected</span></td>
+  <td data-label="Submitted" class="muted-sm nowrap">14 Aug 2026</td>
+  <td data-label="Action" class="r"><div class="actions"><span class="tiny">—</span></div></td></tr><tr>
+  <td data-label="Date" class="primary nowrap">8–16 Jun 2026</td>
+  <td data-label="Leave type">Annual Leave</td>
+  <td data-label="Days" class="r num">4</td><td data-label="Status"><span class="badge badge-approved">Approved</span></td>
+  <td data-label="Submitted" class="muted-sm nowrap">14 Aug 2026</td>
+  <td data-label="Action" class="r"><div class="actions"><span class="tiny">—</span></div></td></tr>
+</tbody></table></div></div></div></div></div>
+  </div></div></div><div class="pv-screen " id="s-request"><div class="shell">
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark">ISX</div><div class="brand-text"><span class="brand-name">Leave</span><span class="brand-sub">ISX Company</span></div></div>
+    <nav class="nav"><div class="nav-label">My leave</div><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg></span><span>Dashboard</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg></span><span>My leave</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span><span>Calendar</span></a><a class="nav-item" href="#" aria-current="page"><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span><span>Request leave</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg></span><span>Profile</span></a></nav>
+    <div class="sidebar-foot"><div class="userbox"><div class="avatar ">JM</div>
+      <div class="userbox-meta"><div class="userbox-name">Jane Mitchell</div><div class="userbox-role">Employee</div></div>
+      <button class="btn btn-ghost btn-sm" style="margin-left:auto" title="Sign out"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2"/><path d="M10 12h11m0 0-3-3m3 3-3 3"/></svg></button></div></div>
+  </aside>
+  <div class="main">
+    <header class="topbar"><h1>Request leave</h1><div class="topbar-spacer"></div>
+      <button class="btn btn-ghost" style="position:relative"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 1 1 12 0c0 4.5 1.5 6 1.5 6h-15S6 13.5 6 9z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>
+      <span style="position:absolute;top:4px;right:5px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--c-bad);color:#fff;font-size:10px;font-weight:700;display:grid;place-items:center">2</span></button>
+    </header>
+    <div class="content">
+<div class="page-head"><div class="grow"><h1>Request leave</h1>
+<p class="muted">You have <b>8 days</b> available to book in 2026.</p></div></div>
+<div class="grid-2">
+ <div class="card"><div class="card-head"><div style="flex:1"><h2>Request leave</h2><p class="muted-sm" style="margin-top:2px">Days are deducted only for office working days that aren't public holidays.</p></div></div>
+  <div class="card-body stack">
+    <div class="field"><label>Leave type</label><select class="select"><option>Annual Leave</option></select><span class="hint">Paid time off from the yearly entitlement.</span></div>
+    <div class="form-grid">
+      <div class="field"><label>Start date</label><input class="input" type="text" value="2026-09-18"></div>
+      <div class="field"><label>End date</label><input class="input" type="text" value="2026-09-22"></div>
+    </div>
+    <div class="field"><label>Reason or note</label><textarea class="textarea">Long weekend with family</textarea><span class="hint">Optional — helpful context for whoever approves it.</span></div>
+  </div>
+  <div class="card-foot spread"><span class="tiny">2 day(s) will be deducted</span>
+  <button class="btn btn-primary">Submit request</button></div></div>
+ <div class="stack">
+  <div class="card"><div class="card-head"><h2>How this is calculated</h2></div><div class="card-body">
+   <div class="breakdown">
+     <div class="breakdown-row"><span class="lbl">Calendar days selected</span><span class="val">5</span></div>
+     <div class="breakdown-row"><span class="lbl">Non-office days (weekends and days ISX doesn't work)</span><span class="val">− 3</span></div>
+     <div class="breakdown-row"><span class="lbl">Public holidays falling on an office day</span><span class="val">− 0</span></div>
+     <div class="breakdown-row total"><span class="lbl">Leave days deducted</span><span class="val">2</span></div>
+   </div>
+   <div class="mt-16"><div class="tiny" style="font-weight:650;margin-bottom:6px">Days in this range</div>
+   <div class="stack" style="gap:4px"><div class="row" style="gap:8px"><span class="tiny" style="width:96px">18 Sep 2026</span>
+     <span class="tiny">Friday</span>
+     <span class="chip" style="margin-left:auto;">non-office day</span></div><div class="row" style="gap:8px"><span class="tiny" style="width:96px">19 Sep 2026</span>
+     <span class="tiny">Saturday</span>
+     <span class="chip" style="margin-left:auto;">non-office day</span></div><div class="row" style="gap:8px"><span class="tiny" style="width:96px">20 Sep 2026</span>
+     <span class="tiny">Sunday</span>
+     <span class="chip" style="margin-left:auto;">non-office day</span></div><div class="row" style="gap:8px"><span class="tiny" style="width:96px">21 Sep 2026</span>
+     <span class="tiny">Monday</span>
+     <span class="chip" style="margin-left:auto;background:var(--c-brand-soft);color:var(--c-brand-ink)">deducted</span></div><div class="row" style="gap:8px"><span class="tiny" style="width:96px">22 Sep 2026</span>
+     <span class="tiny">Tuesday</span>
+     <span class="chip" style="margin-left:auto;background:var(--c-brand-soft);color:var(--c-brand-ink)">deducted</span></div></div></div>
+  </div></div>
+  <div class="card"><div class="card-head"><h2>Your balance</h2></div><div class="card-body">
+   <dl class="dl"><dt>Annual entitlement</dt><dd class="num">15 days</dd>
+   <dt>Approved so far</dt><dd class="num">6 days</dd>
+   <dt>Awaiting approval</dt><dd class="num">1 days</dd>
+   <dt>Available to book</dt><dd class="num">8 days</dd></dl>
+   <p class="tiny mt-16">Only approved leave reduces your official balance. Pending requests are held aside so you can't book the same days twice.</p>
+  </div></div>
+ </div></div></div>
+  </div></div></div><div class="pv-screen " id="s-admin-dashboard"><div class="shell">
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark">ISX</div><div class="brand-text"><span class="brand-name">Leave</span><span class="brand-sub">ISX Company</span></div></div>
+    <nav class="nav"><div class="nav-label">My leave</div><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg></span><span>Dashboard</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg></span><span>My leave</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span><span>Calendar</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span><span>Request leave</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg></span><span>Profile</span></a><div class="nav-label">Administration</div><a class="nav-item" href="#" aria-current="page"><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5.5c0 4.6-3 8.2-7 9.5-4-1.3-7-4.9-7-9.5V6z"/><path d="m9.5 12 1.8 1.8 3.5-3.6"/></svg></span><span>Admin dashboard</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg></span><span>Leave requests</span><span class="count">2</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 5.2a3.2 3.2 0 0 1 0 5.6M17.5 14.5a6.5 6.5 0 0 1 4 5.5"/></svg></span><span>Employees</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span><span>Company calendar</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8.5"/></svg></span><span>Settings</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg></span><span>Audit log</span></a></nav>
+    <div class="sidebar-foot"><div class="userbox"><div class="avatar ">SW</div>
+      <div class="userbox-meta"><div class="userbox-name">Somchai Wattana</div><div class="userbox-role">Administrator</div></div>
+      <button class="btn btn-ghost btn-sm" style="margin-left:auto" title="Sign out"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2"/><path d="M10 12h11m0 0-3-3m3 3-3 3"/></svg></button></div></div>
+  </aside>
+  <div class="main">
+    <header class="topbar"><h1>Admin dashboard</h1><div class="topbar-spacer"></div>
+      <button class="btn btn-ghost" style="position:relative"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 1 1 12 0c0 4.5 1.5 6 1.5 6h-15S6 13.5 6 9z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>
+      <span style="position:absolute;top:4px;right:5px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--c-bad);color:#fff;font-size:10px;font-weight:700;display:grid;place-items:center">2</span></button>
+    </header>
+    <div class="content">
+<div class="page-head"><div class="grow"><h1>ISX Leave Management</h1>
+<p class="muted">2 requests waiting on you.</p></div><a class="btn" href="#">All requests</a></div>
+<div class="kpis">
+ <div class="kpi "><div class="kpi-label">Employees</div>
+  <div class="kpi-value ">5</div>
+  
+  <div class="kpi-sub">4 active</div></div>
+ <div class="kpi warn"><div class="kpi-label">Pending requests</div>
+  <div class="kpi-value ">2</div>
+  
+  <div class="kpi-sub">Needs a decision</div></div>
+ <div class="kpi "><div class="kpi-label">Approved this month</div>
+  <div class="kpi-value ">1</div>
+  
+  <div class="kpi-sub">Requests starting this month</div></div>
+ <div class="kpi "><div class="kpi-label">Leave days used</div>
+  <div class="kpi-value ">11<span class="unit">days</span></div>
+  
+  <div class="kpi-sub">Company-wide in 2026</div></div>
+</div>
+<div class="section"><div class="card"><div class="card-head"><div style="flex:1"><h2>Pending leave requests</h2>
+<p class="muted-sm" style="margin-top:2px">Approve or reject directly from here.</p></div></div>
+<div class="card-body flush"><div class="table-wrap"><table class="tbl">
+<thead><tr><th>Employee</th><th>Leave</th><th>Date</th><th class="r">Days</th><th>Status</th><th class="r">Action</th></tr></thead>
+<tbody><tr><td data-label="Employee"><div class="person"><div class="avatar ">JP</div><div><div class="person-name">John Prasert</div><div class="person-mail">john@demo.isx.local</div></div></div></td>
+<td data-label="Leave">Annual Leave<div class="tiny" style="margin-top:2px">Holiday in Japan</div></td>
+<td data-label="Date" class="nowrap">24 Aug – 1 Sep 2026</td><td data-label="Days" class="r num">4</td>
+<td data-label="Status"><span class="badge badge-pending">Pending</span></td>
+<td data-label="Action" class="r"><div class="actions"><button class="btn btn-sm btn-ok">Approve</button><button class="btn btn-sm btn-danger">Reject</button></div></td></tr><tr><td data-label="Employee"><div class="person"><div class="avatar ">JM</div><div><div class="person-name">Jane Mitchell</div><div class="person-mail">jane@demo.isx.local</div></div></div></td>
+<td data-label="Leave">Personal Leave<div class="tiny" style="margin-top:2px">Apartment move</div></td>
+<td data-label="Date" class="nowrap">12–13 Oct 2026</td><td data-label="Days" class="r num">1</td>
+<td data-label="Status"><span class="badge badge-pending">Pending</span></td>
+<td data-label="Action" class="r"><div class="actions"><button class="btn btn-sm btn-ok">Approve</button><button class="btn btn-sm btn-danger">Reject</button></div></td></tr>
+</tbody></table></div></div></div></div>
+<div class="section grid-2">
+ <div class="card"><div class="card-head"><div style="flex:1"><h2>Employee leave overview</h2><p class="muted-sm" style="margin-top:2px">Balances for 2026</p></div><a class="btn btn-sm" href="#">Manage</a></div>
+ <div class="card-body flush"><div class="table-wrap"><table class="tbl">
+ <thead><tr><th>Employee</th><th class="r">Entitlement</th><th class="r">Used</th><th class="r">Remaining</th></tr></thead>
+ <tbody><tr><td data-label="Employee"><div class="person"><div class="avatar ">JM</div><div><div class="person-name">Jane Mitchell</div><div class="person-mail">jane@demo.isx.local</div></div></div></td>
+ <td data-label="Entitlement" class="r num">15</td><td data-label="Used" class="r num">6</td>
+ <td data-label="Remaining" class="r num primary">9</td></tr><tr><td data-label="Employee"><div class="person"><div class="avatar ">JP</div><div><div class="person-name">John Prasert</div><div class="person-mail">john@demo.isx.local</div></div></div></td>
+ <td data-label="Entitlement" class="r num">20</td><td data-label="Used" class="r num">2</td>
+ <td data-label="Remaining" class="r num primary">18</td></tr><tr><td data-label="Employee"><div class="person"><div class="avatar ">MC</div><div><div class="person-name">Mike Chen</div><div class="person-mail">mike@demo.isx.local</div></div></div></td>
+ <td data-label="Entitlement" class="r num">12</td><td data-label="Used" class="r num">3</td>
+ <td data-label="Remaining" class="r num primary">9</td></tr><tr><td data-label="Employee"><div class="person"><div class="avatar ">SW</div><div><div class="person-name">Somchai Wattana</div><div class="person-mail">admin@demo.isx.local</div></div></div></td>
+ <td data-label="Entitlement" class="r num">15</td><td data-label="Used" class="r num">0</td>
+ <td data-label="Remaining" class="r num primary">15</td></tr><tr><td data-label="Employee"><div class="person"><div class="avatar ">PS</div><div><div class="person-name">Ploy Sirikul</div><div class="person-mail">ploy@demo.isx.local</div></div></div></td>
+ <td data-label="Entitlement" class="r num">15</td><td data-label="Used" class="r num">0</td>
+ <td data-label="Remaining" class="r num primary">15</td></tr></tbody></table></div></div></div>
+ <div class="card"><div class="card-head"><div style="flex:1"><h2>Upcoming leave</h2><p class="muted-sm" style="margin-top:2px">Approved, in the next 45 days</p></div></div>
+ <div class="card-body"><div class="stack" style="gap:14px"><div class="row" style="gap:10px;align-items:flex-start">
+ <div style="flex:1"><div style="font-size:13px;font-weight:600">Mike Chen</div>
+ <div class="tiny">17–18 Aug 2026 · Annual Leave · 2d</div></div>
+ <span class="chip">in 3 days</span></div><div class="row" style="gap:10px;align-items:flex-start">
+ <div style="flex:1"><div style="font-size:13px;font-weight:600">Jane Mitchell</div>
+ <div class="tiny">18–22 Sep 2026 · Annual Leave · 2d</div></div>
+ <span class="chip">in 1 month</span></div></div></div></div>
+</div></div>
+  </div></div></div><div class="pv-screen " id="s-admin-calendar"><div class="shell">
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark">ISX</div><div class="brand-text"><span class="brand-name">Leave</span><span class="brand-sub">ISX Company</span></div></div>
+    <nav class="nav"><div class="nav-label">My leave</div><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg></span><span>Dashboard</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg></span><span>My leave</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span><span>Calendar</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span><span>Request leave</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg></span><span>Profile</span></a><div class="nav-label">Administration</div><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5.5c0 4.6-3 8.2-7 9.5-4-1.3-7-4.9-7-9.5V6z"/><path d="m9.5 12 1.8 1.8 3.5-3.6"/></svg></span><span>Admin dashboard</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg></span><span>Leave requests</span><span class="count">2</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 5.2a3.2 3.2 0 0 1 0 5.6M17.5 14.5a6.5 6.5 0 0 1 4 5.5"/></svg></span><span>Employees</span></a><a class="nav-item" href="#" aria-current="page"><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span><span>Company calendar</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8.5"/></svg></span><span>Settings</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg></span><span>Audit log</span></a></nav>
+    <div class="sidebar-foot"><div class="userbox"><div class="avatar ">SW</div>
+      <div class="userbox-meta"><div class="userbox-name">Somchai Wattana</div><div class="userbox-role">Administrator</div></div>
+      <button class="btn btn-ghost btn-sm" style="margin-left:auto" title="Sign out"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2"/><path d="M10 12h11m0 0-3-3m3 3-3 3"/></svg></button></div></div>
+  </aside>
+  <div class="main">
+    <header class="topbar"><h1>Company calendar</h1><div class="topbar-spacer"></div>
+      <button class="btn btn-ghost" style="position:relative"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 1 1 12 0c0 4.5 1.5 6 1.5 6h-15S6 13.5 6 9z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>
+      <span style="position:absolute;top:4px;right:5px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--c-bad);color:#fff;font-size:10px;font-weight:700;display:grid;place-items:center">2</span></button>
+    </header>
+    <div class="content">
+<div class="page-head"><div class="grow"><h1>Company calendar</h1>
+<p class="muted">Everyone's approved and pending leave. Office days are <b>Monday + Tuesday</b>.</p></div>
+<select class="select" style="width:210px"><option>All employees</option><option>Jane Mitchell</option><option>John Prasert</option><option>Mike Chen</option></select></div>
+<div class="grid-2">
+ <div class="card"><div class="card-body"><div><div class="cal-head"><div class="cal-title">September 2026</div>
+    <div class="row" style="margin-left:auto;gap:6px">
+      <button class="btn btn-sm">&lsaquo;</button><button class="btn btn-sm">Today</button><button class="btn btn-sm">&rsaquo;</button></div></div>
+    <div class="cal"><div class="cal-dow"><div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div></div>
+    <div class="cal-grid"><div class="cal-cell out"><div class="cal-num">30</div>
+      
+      
+      <div class="cal-tag pending" title="John Prasert — Annual Leave — pending">John Prasert</div>
+      </div><div class="cal-cell out office"><div class="cal-num">31</div>
+      <span class="cal-office-dot" title="Office day"></span>
+      
+      <div class="cal-tag pending" title="John Prasert — Annual Leave — pending">John Prasert</div>
+      </div><div class="cal-cell office"><div class="cal-num">1</div>
+      <span class="cal-office-dot" title="Office day"></span>
+      
+      <div class="cal-tag pending" title="John Prasert — Annual Leave — pending">John Prasert</div>
+      </div><div class="cal-cell"><div class="cal-num">2</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">3</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">4</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">5</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">6</div>
+      
+      
+      
+      </div><div class="cal-cell office"><div class="cal-num">7</div>
+      <span class="cal-office-dot" title="Office day"></span>
+      
+      
+      </div><div class="cal-cell office"><div class="cal-num">8</div>
+      <span class="cal-office-dot" title="Office day"></span>
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">9</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">10</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">11</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">12</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">13</div>
+      
+      
+      
+      </div><div class="cal-cell office"><div class="cal-num">14</div>
+      <span class="cal-office-dot" title="Office day"></span>
+      
+      
+      </div><div class="cal-cell office"><div class="cal-num">15</div>
+      <span class="cal-office-dot" title="Office day"></span>
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">16</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">17</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">18</div>
+      
+      
+      <div class="cal-tag approved" title="Jane Mitchell — Annual Leave — approved">Jane Mitchell</div>
+      </div><div class="cal-cell"><div class="cal-num">19</div>
+      
+      
+      <div class="cal-tag approved" title="Jane Mitchell — Annual Leave — approved">Jane Mitchell</div>
+      </div><div class="cal-cell"><div class="cal-num">20</div>
+      
+      
+      <div class="cal-tag approved" title="Jane Mitchell — Annual Leave — approved">Jane Mitchell</div>
+      </div><div class="cal-cell office"><div class="cal-num">21</div>
+      <span class="cal-office-dot" title="Office day"></span>
+      
+      <div class="cal-tag approved" title="Jane Mitchell — Annual Leave — approved">Jane Mitchell</div>
+      </div><div class="cal-cell office"><div class="cal-num">22</div>
+      <span class="cal-office-dot" title="Office day"></span>
+      
+      <div class="cal-tag approved" title="Jane Mitchell — Annual Leave — approved">Jane Mitchell</div>
+      </div><div class="cal-cell"><div class="cal-num">23</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">24</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">25</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">26</div>
+      
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">27</div>
+      
+      
+      
+      </div><div class="cal-cell office"><div class="cal-num">28</div>
+      <span class="cal-office-dot" title="Office day"></span>
+      
+      
+      </div><div class="cal-cell office"><div class="cal-num">29</div>
+      <span class="cal-office-dot" title="Office day"></span>
+      
+      
+      </div><div class="cal-cell"><div class="cal-num">30</div>
+      
+      
+      
+      </div><div class="cal-cell out"><div class="cal-num">1</div>
+      
+      
+      
+      </div><div class="cal-cell out"><div class="cal-num">2</div>
+      
+      
+      
+      </div><div class="cal-cell out"><div class="cal-num">3</div>
+      
+      
+      
+      </div><div class="cal-cell out"><div class="cal-num">4</div>
+      
+      
+      
+      </div><div class="cal-cell out office"><div class="cal-num">5</div>
+      <span class="cal-office-dot" title="Office day"></span>
+      
+      
+      </div><div class="cal-cell out office"><div class="cal-num">6</div>
+      <span class="cal-office-dot" title="Office day"></span>
+      
+      
+      </div><div class="cal-cell out"><div class="cal-num">7</div>
+      
+      
+      
+      </div><div class="cal-cell out"><div class="cal-num">8</div>
+      
+      
+      
+      </div><div class="cal-cell out"><div class="cal-num">9</div>
+      
+      
+      
+      </div><div class="cal-cell out"><div class="cal-num">10</div>
+      
+      
+      
+      </div></div></div>
+    <div class="legend"><span class="legend-item"><span class="legend-swatch" style="background:var(--cal-office)"></span>Office day</span><span class="legend-item"><span class="legend-swatch" style="background:var(--cal-approved)"></span>Approved leave</span><span class="legend-item"><span class="legend-swatch" style="background:var(--cal-pending)"></span>Pending leave</span><span class="legend-item"><span class="legend-swatch" style="background:var(--cal-holiday)"></span>Public holiday</span><span class="legend-item"><span class="legend-swatch" style="background:var(--c-surface)"></span>Non-office day</span></div></div></div></div>
+ <div class="stack">
+  <div class="card"><div class="card-head"><div style="flex:1"><h2>Who's away this month</h2></div></div><div class="card-body">
+  <div class="stack" style="gap:12px"><div class="row" style="gap:10px;align-items:flex-start">
+  <div style="flex:1"><div style="font-size:13px;font-weight:600">Mike Chen</div><div class="tiny">17–18 Aug 2026 · Annual Leave</div></div>
+  <span class="chip num">2d</span></div><div class="row" style="gap:10px;align-items:flex-start">
+  <div style="flex:1"><div style="font-size:13px;font-weight:600">Jane Mitchell</div><div class="tiny">18–22 Sep 2026 · Annual Leave</div></div>
+  <span class="chip num">2d</span></div></div></div></div>
+  <div class="card"><div class="card-head"><h2>Holidays this month</h2></div><div class="card-body">
+  <div class="stack" style="gap:10px"><p class="muted-sm">No public holidays this month.</p></div></div></div>
+ </div></div></div>
+  </div></div></div><div class="pv-screen " id="s-admin-settings"><div class="shell">
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark">ISX</div><div class="brand-text"><span class="brand-name">Leave</span><span class="brand-sub">ISX Company</span></div></div>
+    <nav class="nav"><div class="nav-label">My leave</div><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg></span><span>Dashboard</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg></span><span>My leave</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span><span>Calendar</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span><span>Request leave</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg></span><span>Profile</span></a><div class="nav-label">Administration</div><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5.5c0 4.6-3 8.2-7 9.5-4-1.3-7-4.9-7-9.5V6z"/><path d="m9.5 12 1.8 1.8 3.5-3.6"/></svg></span><span>Admin dashboard</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg></span><span>Leave requests</span><span class="count">2</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 5.2a3.2 3.2 0 0 1 0 5.6M17.5 14.5a6.5 6.5 0 0 1 4 5.5"/></svg></span><span>Employees</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span><span>Company calendar</span></a><a class="nav-item" href="#" aria-current="page"><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8.5"/></svg></span><span>Settings</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg></span><span>Audit log</span></a></nav>
+    <div class="sidebar-foot"><div class="userbox"><div class="avatar ">SW</div>
+      <div class="userbox-meta"><div class="userbox-name">Somchai Wattana</div><div class="userbox-role">Administrator</div></div>
+      <button class="btn btn-ghost btn-sm" style="margin-left:auto" title="Sign out"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2"/><path d="M10 12h11m0 0-3-3m3 3-3 3"/></svg></button></div></div>
+  </aside>
+  <div class="main">
+    <header class="topbar"><h1>Settings</h1><div class="topbar-spacer"></div>
+      <button class="btn btn-ghost" style="position:relative"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 1 1 12 0c0 4.5 1.5 6 1.5 6h-15S6 13.5 6 9z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>
+      <span style="position:absolute;top:4px;right:5px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--c-bad);color:#fff;font-size:10px;font-weight:700;display:grid;place-items:center">2</span></button>
+    </header>
+    <div class="content">
+<div class="page-head"><div class="grow"><h1>Settings</h1><p class="muted">Working calendar, holidays and company-wide leave defaults.</p></div></div>
+<div class="grid-2">
+ <div class="stack">
+  <div class="card"><div class="card-head"><div style="flex:1"><h2>Office working days</h2>
+  <p class="muted-sm" style="margin-top:2px">In force since 1 Jan 2026. These are the days leave is deducted for.</p></div></div>
+  <div class="card-body stack">
+   <div class="stack" style="gap:6px"><label class="check on">
+   <input type="checkbox" checked><span class="check-body"><span class="check-title">Monday</span></span></label><label class="check on">
+   <input type="checkbox" checked><span class="check-body"><span class="check-title">Tuesday</span></span></label><label class="check ">
+   <input type="checkbox" ><span class="check-body"><span class="check-title">Wednesday</span></span></label><label class="check ">
+   <input type="checkbox" ><span class="check-body"><span class="check-title">Thursday</span></span></label><label class="check ">
+   <input type="checkbox" ><span class="check-body"><span class="check-title">Friday</span></span></label><label class="check ">
+   <input type="checkbox" ><span class="check-body"><span class="check-title">Saturday</span></span></label><label class="check ">
+   <input type="checkbox" ><span class="check-body"><span class="check-title">Sunday</span></span></label></div>
+   <div class="field"><label>Takes effect from</label><input class="input" value="2026-08-14"><span class="hint">Leave already approved keeps the day count it was approved with.</span></div>
+   <div class="alert alert-info"><span>Changing office days only affects requests submitted <b>after</b> the effective date. Historical requests keep their original calculation so past approvals stay auditable.</span></div>
+  </div><div class="card-foot" style="text-align:right"><button class="btn btn-primary">Save office days</button></div></div>
+  <div class="card"><div class="card-head"><div style="flex:1"><h2>Default annual entitlement</h2><p class="muted-sm" style="margin-top:2px">Used for new employees and for anyone without a row for a given year.</p></div></div>
+  <div class="card-body"><div class="field"><label>Days per year</label><input class="input" value="15"><span class="hint">Individual employees can still be given more or fewer days.</span></div></div>
+  <div class="card-foot" style="text-align:right"><button class="btn btn-primary">Save default</button></div></div>
+ </div>
+ <div class="card"><div class="card-head" style="flex-wrap:wrap;gap:8px">
+   <div style="flex:1;min-width:140px"><h2>Public holidays</h2><p class="muted-sm" style="margin-top:2px">Source of truth: Bank of Thailand financial-institution calendar.</p></div>
+   <select class="select" style="width:104px"><option>2026</option><option>2027</option></select>
+   <button class="btn btn-sm">Import year</button><button class="btn btn-sm btn-primary"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add</button></div>
+  <div class="card-body flush"><div class="table-wrap"><table class="tbl">
+  <thead><tr><th>Date</th><th>Holiday</th><th>Source</th><th>Status</th><th class="r">Action</th></tr></thead>
+  <tbody><tr><td data-label="Date" class="primary nowrap">1 Jan 2026</td>
+  <td data-label="Holiday">New Year's Day<div class="tiny">วันขึ้นปีใหม่</div></td>
+  <td data-label="Source"><span class="badge plain badge-info">BOT</span></td>
+  <td data-label="Status"><span class="badge badge-approved">Active</span></td>
+  <td data-label="Action" class="r"><div class="actions"><button class="btn btn-sm">Disable</button></div></td></tr><tr><td data-label="Date" class="primary nowrap">2 Jan 2026</td>
+  <td data-label="Holiday">Additional Special Holiday<div class="tiny">วันหยุดพิเศษเพิ่มเติม</div></td>
+  <td data-label="Source"><span class="badge plain badge-info">BOT</span></td>
+  <td data-label="Status"><span class="badge badge-approved">Active</span></td>
+  <td data-label="Action" class="r"><div class="actions"><button class="btn btn-sm">Disable</button></div></td></tr><tr><td data-label="Date" class="primary nowrap">3 Mar 2026</td>
+  <td data-label="Holiday">Makha Bucha Day<div class="tiny">วันมาฆบูชา</div></td>
+  <td data-label="Source"><span class="badge plain badge-info">BOT</span></td>
+  <td data-label="Status"><span class="badge badge-approved">Active</span></td>
+  <td data-label="Action" class="r"><div class="actions"><button class="btn btn-sm">Disable</button></div></td></tr><tr><td data-label="Date" class="primary nowrap">6 Apr 2026</td>
+  <td data-label="Holiday">Chakri Memorial Day<div class="tiny">วันจักรี</div></td>
+  <td data-label="Source"><span class="badge plain badge-info">BOT</span></td>
+  <td data-label="Status"><span class="badge badge-approved">Active</span></td>
+  <td data-label="Action" class="r"><div class="actions"><button class="btn btn-sm">Disable</button></div></td></tr><tr><td data-label="Date" class="primary nowrap">13 Apr 2026</td>
+  <td data-label="Holiday">Songkran Festival<div class="tiny">วันสงกรานต์</div></td>
+  <td data-label="Source"><span class="badge plain badge-info">BOT</span></td>
+  <td data-label="Status"><span class="badge badge-approved">Active</span></td>
+  <td data-label="Action" class="r"><div class="actions"><button class="btn btn-sm">Disable</button></div></td></tr><tr><td data-label="Date" class="primary nowrap">14 Apr 2026</td>
+  <td data-label="Holiday">Songkran Festival<div class="tiny">วันสงกรานต์</div></td>
+  <td data-label="Source"><span class="badge plain badge-info">BOT</span></td>
+  <td data-label="Status"><span class="badge badge-approved">Active</span></td>
+  <td data-label="Action" class="r"><div class="actions"><button class="btn btn-sm">Disable</button></div></td></tr><tr><td data-label="Date" class="primary nowrap">15 Apr 2026</td>
+  <td data-label="Holiday">Songkran Festival<div class="tiny">วันสงกรานต์</div></td>
+  <td data-label="Source"><span class="badge plain badge-info">BOT</span></td>
+  <td data-label="Status"><span class="badge badge-approved">Active</span></td>
+  <td data-label="Action" class="r"><div class="actions"><button class="btn btn-sm">Disable</button></div></td></tr><tr><td data-label="Date" class="primary nowrap">1 May 2026</td>
+  <td data-label="Holiday">National Labour Day<div class="tiny">วันแรงงานแห่งชาติ</div></td>
+  <td data-label="Source"><span class="badge plain badge-info">BOT</span></td>
+  <td data-label="Status"><span class="badge badge-approved">Active</span></td>
+  <td data-label="Action" class="r"><div class="actions"><button class="btn btn-sm">Disable</button></div></td></tr><tr><td data-label="Date" class="primary nowrap">4 May 2026</td>
+  <td data-label="Holiday">Coronation Day<div class="tiny">วันฉัตรมงคล</div></td>
+  <td data-label="Source"><span class="badge plain badge-info">BOT</span></td>
+  <td data-label="Status"><span class="badge badge-approved">Active</span></td>
+  <td data-label="Action" class="r"><div class="actions"><button class="btn btn-sm">Disable</button></div></td></tr><tr><td data-label="Date" class="primary nowrap">1 Jun 2026</td>
+  <td data-label="Holiday">Substitution for Visakha Bucha Day<div class="tiny">ชดเชยวันวิสาขบูชา</div></td>
+  <td data-label="Source"><span class="badge plain badge-info">BOT</span></td>
+  <td data-label="Status"><span class="badge badge-approved">Active</span></td>
+  <td data-label="Action" class="r"><div class="actions"><button class="btn btn-sm">Disable</button></div></td></tr><tr><td data-label="Date" class="primary nowrap">3 Jun 2026</td>
+  <td data-label="Holiday">H.M. Queen Suthida Bajrasudhabimalalakshana's Birthday<div class="tiny">วันเฉลิมพระชนมพรรษาสมเด็จพระนางเจ้าสุทิดาฯ</div></td>
+  <td data-label="Source"><span class="badge plain badge-info">BOT</span></td>
+  <td data-label="Status"><span class="badge badge-approved">Active</span></td>
+  <td data-label="Action" class="r"><div class="actions"><button class="btn btn-sm">Disable</button></div></td></tr><tr><td data-label="Date" class="primary nowrap">28 Jul 2026</td>
+  <td data-label="Holiday">H.M. King Maha Vajiralongkorn Phra Vajiraklaochaoyuhua's Birthday<div class="tiny">วันเฉลิมพระชนมพรรษาพระบาทสมเด็จพระเจ้าอยู่หัว</div></td>
+  <td data-label="Source"><span class="badge plain badge-info">BOT</span></td>
+  <td data-label="Status"><span class="badge badge-approved">Active</span></td>
+  <td data-label="Action" class="r"><div class="actions"><button class="btn btn-sm">Disable</button></div></td></tr><tr><td data-label="Date" class="primary nowrap">29 Jul 2026</td>
+  <td data-label="Holiday">Asarnha Bucha Day<div class="tiny">วันอาสาฬหบูชา</div></td>
+  <td data-label="Source"><span class="badge plain badge-info">BOT</span></td>
+  <td data-label="Status"><span class="badge badge-approved">Active</span></td>
+  <td data-label="Action" class="r"><div class="actions"><button class="btn btn-sm">Disable</button></div></td></tr><tr><td data-label="Date" class="primary nowrap">12 Aug 2026</td>
+  <td data-label="Holiday">H.M. Queen Sirikit The Queen Mother's Birthday and Mother's Day<div class="tiny">วันเฉลิมพระชนมพรรษาสมเด็จพระบรมราชชนนีพันปีหลวง และวันแม่แห่งชาติ</div></td>
+  <td data-label="Source"><span class="badge plain badge-info">BOT</span></td>
+  <td data-label="Status"><span class="badge badge-approved">Active</span></td>
+  <td data-label="Action" class="r"><div class="actions"><button class="btn btn-sm">Disable</button></div></td></tr><tr><td data-label="Date" class="primary nowrap">13 Oct 2026</td>
+  <td data-label="Holiday">H.M. King Bhumibol Adulyadej The Great Memorial Day<div class="tiny">วันนวมินทรมหาราช</div></td>
+  <td data-label="Source"><span class="badge plain badge-info">BOT</span></td>
+  <td data-label="Status"><span class="badge badge-approved">Active</span></td>
+  <td data-label="Action" class="r"><div class="actions"><button class="btn btn-sm">Disable</button></div></td></tr><tr><td data-label="Date" class="primary nowrap">16 Oct 2026</td>
+  <td data-label="Holiday">Additional Special Holiday (Bangkok financial institutions)<div class="tiny">วันหยุดพิเศษสถาบันการเงินในกรุงเทพฯ</div></td>
+  <td data-label="Source"><span class="badge plain badge-info">BOT</span></td>
+  <td data-label="Status"><span class="badge badge-approved">Active</span></td>
+  <td data-label="Action" class="r"><div class="actions"><button class="btn btn-sm">Disable</button></div></td></tr><tr><td data-label="Date" class="primary nowrap">23 Oct 2026</td>
+  <td data-label="Holiday">H.M. King Chulalongkorn The Great Memorial Day<div class="tiny">วันปิยมหาราช</div></td>
+  <td data-label="Source"><span class="badge plain badge-info">BOT</span></td>
+  <td data-label="Status"><span class="badge badge-approved">Active</span></td>
+  <td data-label="Action" class="r"><div class="actions"><button class="btn btn-sm">Disable</button></div></td></tr><tr><td data-label="Date" class="primary nowrap">7 Dec 2026</td>
+  <td data-label="Holiday">Substitution for H.M. King Bhumibol Adulyadej The Great's Birthday, National Day and Father's Day<div class="tiny">ชดเชยวันคล้ายวันพระบรมราชสมภพ ร.9 วันชาติ และวันพ่อแห่งชาติ</div></td>
+  <td data-label="Source"><span class="badge plain badge-info">BOT</span></td>
+  <td data-label="Status"><span class="badge badge-approved">Active</span></td>
+  <td data-label="Action" class="r"><div class="actions"><button class="btn btn-sm">Disable</button></div></td></tr><tr><td data-label="Date" class="primary nowrap">10 Dec 2026</td>
+  <td data-label="Holiday">Constitution Day<div class="tiny">วันรัฐธรรมนูญ</div></td>
+  <td data-label="Source"><span class="badge plain badge-info">BOT</span></td>
+  <td data-label="Status"><span class="badge badge-approved">Active</span></td>
+  <td data-label="Action" class="r"><div class="actions"><button class="btn btn-sm">Disable</button></div></td></tr><tr><td data-label="Date" class="primary nowrap">31 Dec 2026</td>
+  <td data-label="Holiday">New Year's Eve<div class="tiny">วันสิ้นปี</div></td>
+  <td data-label="Source"><span class="badge plain badge-info">BOT</span></td>
+  <td data-label="Status"><span class="badge badge-approved">Active</span></td>
+  <td data-label="Action" class="r"><div class="actions"><button class="btn btn-sm">Disable</button></div></td></tr>
+  </tbody></table></div></div></div>
+</div></div>
+  </div></div></div><div class="pv-screen " id="s-admin-audit"><div class="shell">
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark">ISX</div><div class="brand-text"><span class="brand-name">Leave</span><span class="brand-sub">ISX Company</span></div></div>
+    <nav class="nav"><div class="nav-label">My leave</div><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg></span><span>Dashboard</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg></span><span>My leave</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span><span>Calendar</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span><span>Request leave</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg></span><span>Profile</span></a><div class="nav-label">Administration</div><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5.5c0 4.6-3 8.2-7 9.5-4-1.3-7-4.9-7-9.5V6z"/><path d="m9.5 12 1.8 1.8 3.5-3.6"/></svg></span><span>Admin dashboard</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg></span><span>Leave requests</span><span class="count">2</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 5.2a3.2 3.2 0 0 1 0 5.6M17.5 14.5a6.5 6.5 0 0 1 4 5.5"/></svg></span><span>Employees</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span><span>Company calendar</span></a><a class="nav-item" href="#" ><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8.5"/></svg></span><span>Settings</span></a><a class="nav-item" href="#" aria-current="page"><span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg></span><span>Audit log</span></a></nav>
+    <div class="sidebar-foot"><div class="userbox"><div class="avatar ">SW</div>
+      <div class="userbox-meta"><div class="userbox-name">Somchai Wattana</div><div class="userbox-role">Administrator</div></div>
+      <button class="btn btn-ghost btn-sm" style="margin-left:auto" title="Sign out"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-2"/><path d="M10 12h11m0 0-3-3m3 3-3 3"/></svg></button></div></div>
+  </aside>
+  <div class="main">
+    <header class="topbar"><h1>Audit log</h1><div class="topbar-spacer"></div>
+      <button class="btn btn-ghost" style="position:relative"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 1 1 12 0c0 4.5 1.5 6 1.5 6h-15S6 13.5 6 9z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>
+      <span style="position:absolute;top:4px;right:5px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--c-bad);color:#fff;font-size:10px;font-weight:700;display:grid;place-items:center">2</span></button>
+    </header>
+    <div class="content">
+<div class="page-head"><div class="grow"><h1>Audit log</h1>
+<p class="muted">Append-only record of every decision and configuration change. Written by the database itself, so it can't be bypassed or edited — not even by an administrator.</p></div>
+<select class="select" style="width:210px"><option>Everything</option></select></div>
+<div class="card"><div class="card-head"><div style="flex:1"><h2>Recent activity</h2></div></div>
+<div class="card-body flush"><div class="table-wrap"><table class="tbl">
+<thead><tr><th>When</th><th>Who</th><th>Action</th><th>Details</th></tr></thead>
+<tbody><tr><td data-label="When" class="muted-sm nowrap">15 Aug 2026, 00:45</td>
+  <td data-label="Who" class="primary">System</td>
+  <td data-label="Action"><span class="chip">added an employee</span></td>
+  <td data-label="Details" class="muted-sm">Mike Chen · mike@demo.isx.local</td></tr><tr><td data-label="When" class="muted-sm nowrap">15 Aug 2026, 00:45</td>
+  <td data-label="Who" class="primary">System</td>
+  <td data-label="Action"><span class="chip">added a leave type</span></td>
+  <td data-label="Details" class="muted-sm"></td></tr><tr><td data-label="When" class="muted-sm nowrap">15 Aug 2026, 00:45</td>
+  <td data-label="Who" class="primary">System</td>
+  <td data-label="Action"><span class="chip">added a leave type</span></td>
+  <td data-label="Details" class="muted-sm"></td></tr><tr><td data-label="When" class="muted-sm nowrap">15 Aug 2026, 00:45</td>
+  <td data-label="Who" class="primary">System</td>
+  <td data-label="Action"><span class="chip">added a leave type</span></td>
+  <td data-label="Details" class="muted-sm"></td></tr><tr><td data-label="When" class="muted-sm nowrap">15 Aug 2026, 00:45</td>
+  <td data-label="Who" class="primary">System</td>
+  <td data-label="Action"><span class="chip">added a leave type</span></td>
+  <td data-label="Details" class="muted-sm"></td></tr><tr><td data-label="When" class="muted-sm nowrap">15 Aug 2026, 00:45</td>
+  <td data-label="Who" class="primary">System</td>
+  <td data-label="Action"><span class="chip">changed office working days</span></td>
+  <td data-label="Details" class="muted-sm"></td></tr><tr><td data-label="When" class="muted-sm nowrap">15 Aug 2026, 00:45</td>
+  <td data-label="Who" class="primary">System</td>
+  <td data-label="Action"><span class="chip">changed office working days</span></td>
+  <td data-label="Details" class="muted-sm"></td></tr><tr><td data-label="When" class="muted-sm nowrap">15 Aug 2026, 00:45</td>
+  <td data-label="Who" class="primary">System</td>
+  <td data-label="Action"><span class="chip">changed office working days</span></td>
+  <td data-label="Details" class="muted-sm"></td></tr>
+</tbody></table></div></div></div></div>
+  </div></div></div>
+<script>
+document.querySelectorAll(".pv-bar button").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll(".pv-bar button").forEach(x=>x.setAttribute("aria-pressed","false"));
+  b.setAttribute("aria-pressed","true");
+  document.querySelectorAll(".pv-screen").forEach(s=>s.classList.remove("on"));
+  document.getElementById("s-"+b.dataset.s).classList.add("on");
+  window.scrollTo(0,0);
+}));
+</script></body></html>

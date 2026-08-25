@@ -1,0 +1,31 @@
+{
+  "country": "TH",
+  "year": 2026,
+  "source": "BOT",
+  "sourceName": "Bank of Thailand — Financial Institution Holidays",
+  "sourceUrl": "https://www.bot.or.th/en/financial-institutions-holiday.html",
+  "retrievedAt": "2026-08-14",
+  "notes": "Statutory financial-institution holidays announced by the Bank of Thailand for calendar year 2026, including the two additional special holidays announced separately (2 January, and 16 October for Bangkok).",
+  "holidays": [
+    { "date": "2026-01-01", "name": "New Year's Day", "nameTh": "วันขึ้นปีใหม่" },
+    { "date": "2026-01-02", "name": "Additional Special Holiday", "nameTh": "วันหยุดพิเศษเพิ่มเติม", "note": "Cabinet-declared special holiday; announced by BOT for financial institutions." },
+    { "date": "2026-03-03", "name": "Makha Bucha Day", "nameTh": "วันมาฆบูชา" },
+    { "date": "2026-04-06", "name": "Chakri Memorial Day", "nameTh": "วันจักรี" },
+    { "date": "2026-04-13", "name": "Songkran Festival", "nameTh": "วันสงกรานต์" },
+    { "date": "2026-04-14", "name": "Songkran Festival", "nameTh": "วันสงกรานต์" },
+    { "date": "2026-04-15", "name": "Songkran Festival", "nameTh": "วันสงกรานต์" },
+    { "date": "2026-05-01", "name": "National Labour Day", "nameTh": "วันแรงงานแห่งชาติ" },
+    { "date": "2026-05-04", "name": "Coronation Day", "nameTh": "วันฉัตรมงคล" },
+    { "date": "2026-06-01", "name": "Substitution for Visakha Bucha Day", "nameTh": "ชดเชยวันวิสาขบูชา", "note": "Visakha Bucha Day falls on Sunday 31 May 2026." },
+    { "date": "2026-06-03", "name": "H.M. Queen Suthida Bajrasudhabimalalakshana's Birthday", "nameTh": "วันเฉลิมพระชนมพรรษาสมเด็จพระนางเจ้าสุทิดาฯ" },
+    { "date": "2026-07-28", "name": "H.M. King Maha Vajiralongkorn Phra Vajiraklaochaoyuhua's Birthday", "nameTh": "วันเฉลิมพระชนมพรรษาพระบาทสมเด็จพระเจ้าอยู่หัว" },
+    { "date": "2026-07-29", "name": "Asarnha Bucha Day", "nameTh": "วันอาสาฬหบูชา" },
+    { "date": "2026-08-12", "name": "H.M. Queen Sirikit The Queen Mother's Birthday and Mother's Day", "nameTh": "วันเฉลิมพระชนมพรรษาสมเด็จพระบรมราชชนนีพันปีหลวง และวันแม่แห่งชาติ" },
+    { "date": "2026-10-13", "name": "H.M. King Bhumibol Adulyadej The Great Memorial Day", "nameTh": "วันนวมินทรมหาราช" },
+    { "date": "2026-10-16", "name": "Additional Special Holiday (Bangkok financial institutions)", "nameTh": "วันหยุดพิเศษสถาบันการเงินในกรุงเทพฯ", "note": "BOT-specific: declared for financial institutions in Bangkok." },
+    { "date": "2026-10-23", "name": "H.M. King Chulalongkorn The Great Memorial Day", "nameTh": "วันปิยมหาราช" },
+    { "date": "2026-12-07", "name": "Substitution for H.M. King Bhumibol Adulyadej The Great's Birthday, National Day and Father's Day", "nameTh": "ชดเชยวันคล้ายวันพระบรมราชสมภพ ร.9 วันชาติ และวันพ่อแห่งชาติ", "note": "5 December 2026 falls on a Saturday." },
+    { "date": "2026-12-10", "name": "Constitution Day", "nameTh": "วันรัฐธรรมนูญ" },
+    { "date": "2026-12-31", "name": "New Year's Eve", "nameTh": "วันสิ้นปี" }
+  ]
+}

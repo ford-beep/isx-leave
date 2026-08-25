@@ -1,0 +1,39 @@
+{
+  "name": "isx-leave-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ISX Leave Management Dashboard — internal leave requests, approvals and working-calendar management.",
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "typecheck": "tsc --noEmit",
+    "db:setup": "bash scripts/setup-local-db.sh",
+    "db:migrate": "tsx scripts/migrate.ts",
+    "db:reset": "tsx scripts/migrate.ts --reset && tsx scripts/seed.ts",
+    "db:seed": "tsx scripts/seed.ts",
+    "db:test": "bash scripts/run-db-tests.sh",
+    "holidays:import": "tsx scripts/import-holidays.ts",
+    "admin:create": "tsx scripts/create-admin.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "next": "^15.4.6",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "pg": "^8.13.1",
+    "jose": "^5.9.6",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@types/pg": "^8.11.10",
+    "@types/react": "^19.0.7",
+    "@types/react-dom": "^19.0.3",
+    "typescript": "^5.7.3",
+    "tsx": "^4.19.2",
+    "vitest": "^2.1.8",
+    "dotenv": "^16.4.7"
+  },
+  "engines": { "node": ">=20.11" }
+}
