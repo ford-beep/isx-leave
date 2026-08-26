@@ -43,7 +43,7 @@ function makePool() {
   return pool;
 }
 
-// Reuse across hot reloads in development.
+// Reuse the pool across warm server instances and development hot reloads.
 export const pool: Pool = global.__isxPool ?? makePool();
 
 global.__isxPool = pool;
