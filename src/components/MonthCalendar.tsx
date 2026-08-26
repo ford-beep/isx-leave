@@ -96,7 +96,18 @@ export function MonthCalendar({
             const dt = parseISO(date);
             const inMonth = dt.getUTCMonth() === month - 1;
             const isWorkingDay = officeSet.has(dt.getUTCDay());
-            const workMode = workModeByDate.get(date);
+            const explicitWorkMode = workModeByDate.get(date);
+
+            // Default:
+            // Monday + Tuesday = Office
+            // Wednesday–Friday = WFH
+            // An explicit admin override always wins.
+            const defaultWorkMode =
+              dt.getUTCDay() === 1 || dt.getUTCDay() === 2
+                ? "office"
+                 : "wfh";
+
+            const workMode = explicitWorkMode ?? defaultWorkMode;
 
             const isOffice = isWorkingDay && workMode === "office";
             const isWFH = isWorkingDay && workMode === "wfh";
