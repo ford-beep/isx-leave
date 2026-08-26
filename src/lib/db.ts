@@ -34,9 +34,9 @@ declare global {
 function makePool() {
   const pool = new Pool({
     connectionString: env.databaseUrl,
-    max: 10,
-    idleTimeoutMillis: 30_000,
-    connectionTimeoutMillis: 8_000,
+    max: 3,
+    idleTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 5_000,
     application_name: "isx-leave-dashboard",
   });
   pool.on("error", (e) => console.error("[isx-leave] idle pg client error:", e.message));
@@ -45,7 +45,8 @@ function makePool() {
 
 // Reuse across hot reloads in development.
 export const pool: Pool = global.__isxPool ?? makePool();
-if (process.env.NODE_ENV !== "production") global.__isxPool = pool;
+
+global.__isxPool = pool;
 
 export type Db = PoolClient;
 
