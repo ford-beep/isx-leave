@@ -23,9 +23,9 @@ export default async function CalendarPage({
   const [office, holidays, requests, workSchedule] = await Promise.all([
     getOfficeDays(me.id),
     getHolidays(me.id, year),
-    // RLS restricts this to the signed-in employee's own leave. There is no
-    // company-wide view here — that is admin-only (§13).
-    getRequestsInMonth(me.id, year, month),
+    // Personal calendar: always show only the signed-in user's own leave.
+    // Admins can see company-wide leave separately in /admin/calendar.
+    getRequestsInMonth(me.id, year, month, me.id),
     getWorkSchedule(me.id, year, month),
   ]);
 
