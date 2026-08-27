@@ -424,8 +424,34 @@ export async function syncBotHolidaysAction(
       };
     }
 
-    const body = (await response.json()) as BotResponse;
-    data = body.result?.data ?? [];
+    const raw = await response.text();
+
+if (!raw.trim()) {
+  return {
+    ok: false,
+    message: `Bank of Thailand API returned an empty response for ${year}.`,
+  };
+}
+
+let body: BotResponse;
+
+try {
+  body = JSON.parse(raw) as BotResponse;
+} catch (error) {
+  console.error("[BOT sync] invalid JSON:", {
+    year,
+    status: response.status,
+    bodyPreview: raw.slice(0, 300),
+    error,
+  });
+
+  return {
+    ok: false,
+    message: "Bank of Thailand API returned an invalid response.",
+  };
+}
+
+data = body.result?.data ?? [];
 
     if (!Array.isArray(data) || data.length === 0) {
       return {
