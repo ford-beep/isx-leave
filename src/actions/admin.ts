@@ -382,6 +382,54 @@ type BotResponse = {
   };
 };
 
+type BotWebHoliday = {
+  holidayDescription: string;
+  date: string;
+  month: string;
+  year: string;
+};
+
+type BotWebResponse = {
+  notFoundEventLabel?: string;
+  holidayCalendarLists?: BotWebHoliday[];
+};
+
+const THAI_MONTHS: Record<string, number> = {
+  มกราคม: 1,
+  กุมภาพันธ์: 2,
+  มีนาคม: 3,
+  เมษายน: 4,
+  พฤษภาคม: 5,
+  มิถุนายน: 6,
+  กรกฎาคม: 7,
+  สิงหาคม: 8,
+  กันยายน: 9,
+  ตุลาคม: 10,
+  พฤศจิกายน: 11,
+  ธันวาคม: 12,
+};
+
+function parseBotWebDate(h: BotWebHoliday): string {
+  const buddhistYear = Number(h.year);
+  const gregorianYear = buddhistYear - 543;
+  const month = THAI_MONTHS[h.month];
+
+  const dayMatch = h.date.match(/(\d+)\s*$/);
+  const day = dayMatch ? Number(dayMatch[1]) : NaN;
+
+  if (
+    !Number.isInteger(gregorianYear) ||
+    !month ||
+    !Number.isInteger(day)
+  ) {
+    throw new Error(
+      `Invalid BOT web holiday date: ${JSON.stringify(h)}`
+    );
+  }
+
+  return `${gregorianYear}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
 export async function syncBotHolidaysAction(
   _prev: AdminFormState,
   formData: FormData,
@@ -403,69 +451,102 @@ export async function syncBotHolidaysAction(
     };
   }
 
-  let data: BotHoliday[];
+  
+
+let data: BotHoliday[] = [];
+let syncSource = "BOT API";
+
+try {
+  // Try the BOT Gateway API first.
+  const response = await fetch(
+    `https://gateway.api.bot.or.th/financial-institutions-holidays/?year=${year}`,
+    {
+      headers: {
+        Authorization: token,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    },
+  );
+
+  if (response.ok) {
+    const raw = await response.text();
+
+    if (raw.trim()) {
+      try {
+        const body = JSON.parse(raw) as BotResponse;
+        data = body.result?.data ?? [];
+      } catch (error) {
+        console.error("[BOT sync] invalid gateway JSON:", {
+          year,
+          status: response.status,
+          bodyPreview: raw.slice(0, 300),
+          error,
+        });
+      }
+    }
+  } else {
+    console.warn(
+      `[BOT sync] gateway returned ${response.status}; trying website fallback.`,
+    );
+  }
+} catch (error) {
+  console.error("[BOT sync] gateway fetch failed:", error);
+}
+
+// If the Gateway has no data, fall back to the JSON
+// used by the official BOT holiday webpage.
+if (data.length === 0) {
+  const buddhistYear = year + 543;
 
   try {
-    const response = await fetch(
-      `https://gateway.api.bot.or.th/financial-institutions-holidays/?year=${year}`,
+    const fallbackResponse = await fetch(
+      `https://www.bot.or.th/content/bot/th/financial-institutions-holiday/jcr:content/root/container/holidaycalendar_copy.model.${buddhistYear}.json`,
       {
         headers: {
-          Authorization: token,
           Accept: "application/json",
         },
         cache: "no-store",
       },
     );
 
-    if (!response.ok) {
+    if (!fallbackResponse.ok) {
       return {
         ok: false,
-        message: `Bank of Thailand API returned ${response.status}.`,
+        message: `Bank of Thailand website returned ${fallbackResponse.status}.`,
       };
     }
 
-    const raw = await response.text();
+    const fallbackBody =
+      (await fallbackResponse.json()) as BotWebResponse;
 
-if (!raw.trim()) {
-  return {
-    ok: false,
-    message: `Bank of Thailand API returned an empty response for ${year}.`,
-  };
-}
+    const list = fallbackBody.holidayCalendarLists ?? [];
 
-let body: BotResponse;
-
-try {
-  body = JSON.parse(raw) as BotResponse;
-} catch (error) {
-  console.error("[BOT sync] invalid JSON:", {
-    year,
-    status: response.status,
-    bodyPreview: raw.slice(0, 300),
-    error,
-  });
-
-  return {
-    ok: false,
-    message: "Bank of Thailand API returned an invalid response.",
-  };
-}
-
-data = body.result?.data ?? [];
-
-    if (!Array.isArray(data) || data.length === 0) {
+    if (!Array.isArray(list) || list.length === 0) {
       return {
         ok: false,
         message: `No Bank of Thailand holidays are available for ${year}.`,
       };
     }
-  } catch (error) {
-  console.error("[BOT sync] fetch failed:", error);
 
-  return {
-    ok: false,
-    message: "Could not connect to the Bank of Thailand API.",
-  };
+    data = list.map((h) => ({
+      HolidayWeekDay: h.date.replace(/\s+\d+\s*$/, ""),
+      HolidayWeekDayThai: h.date.replace(/\s+\d+\s*$/, ""),
+      Date: parseBotWebDate(h),
+      DateThai: "",
+      HolidayDescription: h.holidayDescription,
+      HolidayDescriptionThai: h.holidayDescription,
+    }));
+
+    syncSource = "BOT website";
+  } catch (error) {
+    console.error("[BOT sync] website fallback failed:", error);
+
+    return {
+      ok: false,
+      message: "Could not load holidays from the Bank of Thailand website.",
+    };
+  }
 }
 
   try {
@@ -508,7 +589,7 @@ data = body.result?.data ?? [];
               keepId,
               h.HolidayDescription,
               h.HolidayDescriptionThai || null,
-              `Synced from BOT API · ${h.HolidayWeekDay}`,
+              `Synced from ${syncSource} · ${h.HolidayWeekDay}`,
             ],
           );
         } else {
