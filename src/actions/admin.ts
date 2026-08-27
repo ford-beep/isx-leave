@@ -433,12 +433,14 @@ export async function syncBotHolidaysAction(
         message: `No Bank of Thailand holidays are available for ${year}.`,
       };
     }
-  } catch {
-    return {
-      ok: false,
-      message: "Could not connect to the Bank of Thailand API.",
-    };
-  }
+  } catch (error) {
+  console.error("[BOT sync] fetch failed:", error);
+
+  return {
+    ok: false,
+    message: "Could not connect to the Bank of Thailand API.",
+  };
+}
 
   try {
     await withUser(me.id, async (db) => {
