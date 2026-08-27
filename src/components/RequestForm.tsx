@@ -4,13 +4,13 @@ import { useActionState, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { previewLeaveAction, submitLeaveAction } from "@/actions/leave";
 import { formatDate } from "@/lib/date";
-import type { LeaveBalance, LeaveCalculation, LeaveType } from "@/lib/types";
+import type { LeaveBalance, LeaveCalculation } from "@/lib/types";
 import { Alert, Card, CardHead, Field } from "./ui";
 import { useActionToast } from "./Toast";
 import { IconAlert, IconCheck } from "./icons";
 
-export function RequestForm({ leaveTypes, balance, today, officeDayNames }: {
-  leaveTypes: LeaveType[]; balance: LeaveBalance; today: string; officeDayNames: string;
+export function RequestForm({ balance, today, officeDayNames }: {
+  balance: LeaveBalance; today: string; officeDayNames: string;
 }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(submitLeaveAction, null);
@@ -21,6 +21,18 @@ export function RequestForm({ leaveTypes, balance, today, officeDayNames }: {
   const [calc, setCalc] = useState<LeaveCalculation | null>(null);
   const [calcError, setCalcError] = useState<string | null>(null);
   const [calcPending, startCalc] = useTransition();
+
+  const earliestStartDate = (() => {
+  const d = new Date(`${today}T00:00:00+07:00`);
+  d.setDate(d.getDate() + 7);
+
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+})();
 
   // Live breakdown, computed by the same SQL function the database uses to
   // validate the request — the preview can never disagree with the outcome.
@@ -43,24 +55,18 @@ export function RequestForm({ leaveTypes, balance, today, officeDayNames }: {
   return (
     <div className="grid-2">
       <Card>
-        <CardHead title="Request leave" sub="Days are deducted only for office working days that aren't public holidays." />
+        <CardHead
+        title="Request leave"sub="Submit at least 7 days in advance. For emergency leave, please contact an admin."/>
         <form action={formAction}>
           <div className="card-body stack">
             {state && !state.ok && !state.field && (
               <Alert kind="error"><IconAlert size={16} /><span>{state.message}</span></Alert>
             )}
 
-            <Field label="Leave type" htmlFor="leaveType" error={err("leaveType")}
-              hint={leaveTypes.find((t) => t.code === "annual")?.description ?? undefined}>
-              <select id="leaveType" name="leaveType" className="select" defaultValue="annual" required>
-                {leaveTypes.map((t) => <option key={t.code} value={t.code}>{t.label}</option>)}
-              </select>
-            </Field>
-
             <div className="form-grid">
               <Field label="Start date" htmlFor="startDate" error={err("startDate")}>
                 <input id="startDate" name="startDate" type="date" className="input" required
-                  min={today} value={startDate}
+                  min={earliestStartDate}
                   onChange={(e) => {
                     setStartDate(e.target.value);
                     if (endDate && e.target.value > endDate) setEndDate(e.target.value);

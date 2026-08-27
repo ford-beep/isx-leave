@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
+import { companyToday } from "@/lib/date";
 import { withUser } from "@/lib/db";
 import { calcLeaveDays } from "@/lib/queries";
 import { toFriendlyError } from "@/lib/errors";
@@ -15,7 +16,6 @@ export type LeaveFormState = {
 } | null;
 
 const requestSchema = z.object({
-  leaveType: z.string().regex(/^[a-z_]{2,32}$/, "Choose a leave type."),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a start date."),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choose an end date."),
   reason: z.string().max(1000, "Please keep the note under 1000 characters.").optional(),
@@ -31,16 +31,35 @@ const requestSchema = z.object({
 export async function submitLeaveAction(_prev: LeaveFormState, formData: FormData): Promise<LeaveFormState> {
   const me = await requireUser();
   const parsed = requestSchema.safeParse({
-    leaveType: String(formData.get("leaveType") ?? ""),
-    startDate: String(formData.get("startDate") ?? ""),
-    endDate: String(formData.get("endDate") ?? ""),
-    reason: String(formData.get("reason") ?? "").trim() || undefined,
+  startDate: String(formData.get("startDate") ?? ""),
+  endDate: String(formData.get("endDate") ?? ""),
+  reason: String(formData.get("reason") ?? "").trim() || undefined,
   });
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
     return { ok: false, message: issue.message, field: String(issue.path[0]) };
   }
-  const { leaveType, startDate, endDate, reason } = parsed.data;
+  const { startDate, endDate, reason } = parsed.data;
+  const leaveType = "annual"; 
+  const today = companyToday();
+
+const earliestStart = new Date(`${today}T00:00:00+07:00`);
+earliestStart.setDate(earliestStart.getDate() + 7);
+
+const earliestStartDate = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Bangkok",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+}).format(earliestStart);
+
+if (startDate < earliestStartDate) {
+  return {
+    ok: false,
+    message: `Leave must be requested at least 7 days in advance. For emergency leave, please contact an admin.`,
+    field: "startDate",
+  };
+}
 
   try {
     await withUser(me.id, (db) => db.query(
@@ -59,28 +78,6 @@ export async function submitLeaveAction(_prev: LeaveFormState, formData: FormDat
   return { ok: true, message: "Leave request submitted. You'll be notified once HR reviews it." };
 }
 
-export async function cancelLeaveAction(_prev: LeaveFormState, formData: FormData): Promise<LeaveFormState> {
-  const me = await requireUser();
-  const id = String(formData.get("id") ?? "");
-  if (!id) return { ok: false, message: "Missing request id." };
-
-  try {
-    // RLS exposes only this employee's still-pending rows for UPDATE, and the
-    // trigger permits only pending -> cancelled. A tampered id changes nothing.
-    const res = await withUser(me.id, (db) =>
-      db.query("update leave_requests set status = 'cancelled' where id = $1", [id]));
-    if (res.rowCount === 0) {
-      return { ok: false, message: "That request can no longer be cancelled." };
-    }
-  } catch (e) {
-    return { ok: false, ...toFriendlyError(e) };
-  }
-
-  revalidatePath("/dashboard");
-  revalidatePath("/my-leave");
-  revalidatePath("/calendar");
-  return { ok: true, message: "Leave request cancelled." };
-}
 
 /** Live breakdown for the request form — computed by the same SQL function. */
 export async function previewLeaveAction(

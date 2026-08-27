@@ -29,12 +29,16 @@ export default async function AdminRequestsPage({
 
   return (
     <>
-      <div className="page-head">
-        <div className="grow">
-          <h1>Leave requests</h1>
-          <p className="muted">Every request across the company, with full history.</p>
-        </div>
-      </div>
+<div className="page-head">
+  <div className="grow">
+    <h1>Leave requests</h1>
+    <p className="muted">Every request across the company, with full history.</p>
+  </div>
+
+  <Link href="/admin/requests/emergency" className="btn btn-primary">
+    Add emergency leave
+  </Link>
+</div>
 
       <Card>
         <div className="card-head" style={{ flexWrap: "wrap", gap: 8 }}>

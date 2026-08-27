@@ -82,6 +82,75 @@ export async function adminCancelLeaveAction(_prev: AdminFormState, formData: Fo
 }
 
 /* ------------------------------------------------------------- employees */
+const emergencyLeaveSchema = z.object({
+  employeeId: z.string().uuid(),
+  startDate: z.string().regex(
+    /^\d{4}-\d{2}-\d{2}$/,
+    "Choose a start date.",
+  ),
+  endDate: z.string().regex(
+    /^\d{4}-\d{2}-\d{2}$/,
+    "Choose an end date.",
+  ),
+  reason: z.string()
+    .trim()
+    .min(3, "Please provide a reason for the emergency leave.")
+    .max(1000),
+});
+
+export async function createEmergencyLeaveAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  const me = await requireAdmin();
+
+  const parsed = emergencyLeaveSchema.safeParse({
+    employeeId: String(formData.get("employeeId") ?? ""),
+    startDate: String(formData.get("startDate") ?? ""),
+    endDate: String(formData.get("endDate") ?? ""),
+    reason: String(formData.get("reason") ?? ""),
+  });
+
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+
+    return {
+      ok: false,
+      message: issue.message,
+      field: String(issue.path[0]),
+    };
+  }
+
+  const d = parsed.data;
+
+  try {
+    await withUser(me.id, (db) =>
+      db.query(
+        `insert into leave_requests (
+           employee_id,
+           leave_type,
+           start_date,
+           end_date,
+           reason,
+           status
+         )
+         values ($1, 'annual', $2::date, $3::date, $4, 'pending')`,
+        [
+          d.employeeId,
+          d.startDate,
+          d.endDate,
+          d.reason,
+        ],
+      ),
+    );
+  } catch (e) {
+    return fail(e);
+  }
+
+  revalidateAdmin();
+
+  return ok("Emergency leave has been added and is waiting for approval.");
+}
 
 const employeeSchema = z.object({
   name: z.string().trim().min(2, "Enter the employee's full name.").max(120),

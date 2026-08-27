@@ -1,6 +1,6 @@
 import { requireUser } from "@/lib/auth";
 import { companyToday, WEEKDAY_NAMES } from "@/lib/date";
-import { getBalance, getLeaveTypes, getOfficeDays } from "@/lib/queries";
+import { getBalance, getOfficeDays } from "@/lib/queries";
 import { RequestForm } from "@/components/RequestForm";
 
 export const dynamic = "force-dynamic";
@@ -10,10 +10,9 @@ export default async function RequestPage() {
   const today = companyToday();
   const year = Number(today.slice(0, 4));
 
-  const [leaveTypes, balance, office] = await Promise.all([
-    getLeaveTypes(me.id),
-    getBalance(me.id, me.id, year),
-    getOfficeDays(me.id),
+  const [balance, office] = await Promise.all([
+  getBalance(me.id, me.id, year),
+  getOfficeDays(me.id),
   ]);
 
   return (
@@ -26,7 +25,6 @@ export default async function RequestPage() {
       </div>
 
       <RequestForm
-        leaveTypes={leaveTypes}
         balance={balance}
         today={today}
         officeDayNames={office.weekdays.map((d) => WEEKDAY_NAMES[d]).join(" + ")}
