@@ -3,6 +3,7 @@ import { companyToday, formatDate } from "@/lib/date";
 import { getBalance, getEntitlements, getUser } from "@/lib/queries";
 import { Card, CardHead, Person } from "@/components/ui";
 import { ChangePasswordForm } from "./ChangePasswordForm";
+import { ProfileForm } from "./ProfileForm";
 
 export const dynamic = "force-dynamic";
 
@@ -29,18 +30,30 @@ export default async function ProfilePage() {
           <Card>
             <CardHead title="Account" />
             <div className="card-body">
-              <Person name={profile?.name ?? me.name} email={profile?.email ?? me.email} />
-              <div className="divider" />
-              <dl className="dl">
+<Person
+  name={profile?.name ?? me.name}
+  email={profile?.email ?? me.email}
+/>
+
+<div className="divider" />
+
+<ProfileForm
+  name={profile?.name ?? me.name}
+  email={profile?.email ?? me.email}
+/>
+
+<div className="divider" />
+
+<dl className="dl">
                 <dt>Job title</dt><dd>{profile?.jobTitle ?? "—"}</dd>
                 <dt>Role</dt><dd>{me.role === "admin" ? "Administrator" : "Employee"}</dd>
                 <dt>Status</dt>
                 <dd><span className="badge badge-approved">Active</span></dd>
                 <dt>Joined</dt><dd>{profile ? formatDate(profile.createdAt.slice(0, 10)) : "—"}</dd>
               </dl>
-              <p className="tiny mt-16">
-                Name, role and entitlement are managed by HR. Ask an administrator if something looks wrong.
-              </p>
+<p className="tiny mt-16">
+  Role and leave entitlement are managed by an administrator.
+</p>
             </div>
           </Card>
 
