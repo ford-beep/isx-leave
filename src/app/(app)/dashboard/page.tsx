@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth";
 import { companyToday, formatRange, relativeDayLabel, WEEKDAY_NAMES } from "@/lib/date";
 import {
-  getBalance, getHolidays, getLeaveTypes, getMyRequests, getNextUpcomingLeave,
+  getBalance, getHolidays, getMyRequests, getNextUpcomingLeave,
   getOfficeDays, getRequestsInMonth,getWorkSchedule,
 } from "@/lib/queries";
 import { Card, CardHead, Kpi } from "@/components/ui";
@@ -38,7 +38,6 @@ const [
   office,
   holidays,
   monthRequests,
-  leaveTypes,
   workSchedule,
 ] = await Promise.all([
   getBalance(me.id, me.id, year),
@@ -47,7 +46,6 @@ const [
   getOfficeDays(me.id),
   getHolidays(me.id, calYear),
   getRequestsInMonth(me.id, calYear, calMonth),
-  getLeaveTypes(me.id),
   getWorkSchedule(me.id, calYear, calMonth),
 ]);
 
@@ -121,17 +119,7 @@ const [
             </div>
           </Card>
 
-          <Card>
-            <CardHead title="Leave types" />
-            <div className="card-body stack" style={{ gap: 10 }}>
-              {leaveTypes.map((t) => (
-                <div key={t.code}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{t.label}</div>
-                  {t.description && <div className="tiny">{t.description}</div>}
-                </div>
-              ))}
-            </div>
-          </Card>
+
         </div>
       </div>
 

@@ -6,6 +6,7 @@ import { Card, CardHead, EmptyState, Person, StatusBadge } from "@/components/ui
 import { AdminDecision } from "@/components/AdminDecision";
 import { FilterSelect } from "@/components/FilterSelect";
 import { IconCheck } from "@/components/icons";
+import { AdminCancelLeave } from "@/components/AdminCancelLeave";
 
 export const dynamic = "force-dynamic";
 
@@ -97,11 +98,15 @@ export default async function AdminRequestsPage({
                       <td data-label="Status"><StatusBadge status={r.status} /></td>
                       <td data-label="Submitted" className="muted-sm nowrap">{formatDate(r.createdAt.slice(0, 10))}</td>
                       <td data-label="Action" className="r">
-                        {r.status === "pending"
-                          ? <AdminDecision request={r} />
-                          : <span className="tiny">
-                              {r.approvedByName ? `by ${r.approvedByName}` : "—"}
-                            </span>}
+                        {r.status === "pending" ? (
+  <AdminDecision request={r} />
+) : r.status === "approved" ? (
+  <AdminCancelLeave request={r} />
+) : (
+  <span className="tiny">
+    {r.approvedByName ? `by ${r.approvedByName}` : "—"}
+  </span>
+)}
                       </td>
                     </tr>
                   ))}

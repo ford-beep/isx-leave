@@ -182,18 +182,84 @@ export async function rejectLeaveAction(
 }
 
 
-/** Admin override — withdraw a request on an employee's behalf. */
-export async function adminCancelLeaveAction(_prev: AdminFormState, formData: FormData): Promise<AdminFormState> {
+/** Admin override — cancel an approved leave on an employee's behalf. */
+export async function adminCancelLeaveAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
   const me = await requireAdmin();
   const id = String(formData.get("id") ?? "");
+
+  if (!id) {
+    return { ok: false, message: "Missing request id." };
+  }
+
   try {
     const res = await withUser(me.id, (db) =>
-      db.query("update leave_requests set status = 'cancelled' where id = $1 and status = 'pending'", [id]));
-    if (res.rowCount === 0) return { ok: false, message: "That request is no longer pending." };
-  } catch (e) { return fail(e); }
+      db.query(
+        `update leave_requests
+         set status = 'cancelled'
+         where id = $1
+           and status = 'approved'`,
+        [id],
+      ),
+    );
+
+    if (res.rowCount === 0) {
+      return {
+        ok: false,
+        message: "Only approved leave can be cancelled.",
+      };
+    }
+  } catch (e) {
+    return fail(e);
+  }
+
+  // Email notification is best-effort.
+  try {
+    const request = await getRequestById(me.id, id);
+
+    if (
+      request?.employeeEmail &&
+      !request.employeeEmail.endsWith("@demo.isx.local")
+    ) {
+      await sendEmail({
+        to: request.employeeEmail,
+        subject: "Your approved leave was cancelled",
+        html: `
+          <h2>Leave cancelled</h2>
+
+          <p>Hi ${request.employeeName ?? "there"},</p>
+
+          <p>Your previously approved leave has been cancelled by an administrator.</p>
+
+          <p>
+            <strong>Start:</strong> ${request.startDate}<br />
+            <strong>End:</strong> ${request.endDate}<br />
+            <strong>Days:</strong> ${request.leaveDays}
+          </p>
+
+          <p>The leave days are no longer counted against your annual leave balance.</p>
+
+          <p>You can view the request in ISX Leave.</p>
+        `,
+      });
+    }
+  } catch (error) {
+    console.error(
+      "[leave email] Could not notify employee of cancellation:",
+      error,
+    );
+  }
+
   revalidateAdmin();
-  return ok("Request cancelled.");
+
+  return ok(
+    "Approved leave cancelled. The employee has been notified.",
+  );
 }
+
+/* ------------------------------------------------------------- employees */
 
 /* ------------------------------------------------------------- employees */
 const emergencyLeaveSchema = z.object({
