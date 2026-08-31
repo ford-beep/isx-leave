@@ -200,6 +200,21 @@ export async function getRequestsInMonth(
   return rows.map(mapRequest);
 }
 
+
+export async function getActiveAdminEmails(
+  me: string,
+): Promise<string[]> {
+  const rows = await queryAs<{ email: string }>(
+    me,
+    `select email from app.active_admin_emails()`,
+  );
+
+  return rows
+  .map((row) => row.email)
+  .filter((email) => !email.endsWith("@demo.isx.local"));
+}
+
+
 /* ------------------------------------------------------------- admin side */
 
 export async function getPendingRequests(me: string): Promise<LeaveRequest[]> {

@@ -5,9 +5,12 @@ import { z } from "zod";
 import { requireUser } from "@/lib/auth";
 import { companyToday } from "@/lib/date";
 import { withUser } from "@/lib/db";
-import { calcLeaveDays } from "@/lib/queries";
+import { sendEmail } from "@/lib/email";
+import { calcLeaveDays, getActiveAdminEmails } from "@/lib/queries";
 import { toFriendlyError } from "@/lib/errors";
 import type { LeaveCalculation } from "@/lib/types";
+
+
 
 export type LeaveFormState = {
   ok: boolean;
@@ -71,7 +74,31 @@ if (startDate < earliestStartDate) {
     const f = toFriendlyError(e);
     return { ok: false, message: f.message, field: f.field };
   }
+  try {
+  const adminEmails = await getActiveAdminEmails(me.id);
 
+  if (adminEmails.length > 0) {
+    await sendEmail({
+      to: adminEmails,
+      subject: `New leave request — ${me.name}`,
+      html: `
+        <h2>New leave request</h2>
+
+        <p><strong>${me.name}</strong> has submitted a leave request.</p>
+
+        <p>
+          <strong>Start:</strong> ${startDate}<br />
+          <strong>End:</strong> ${endDate}<br />
+          <strong>Reason:</strong> ${reason ?? "—"}
+        </p>
+
+        <p>Please sign in to ISX Leave to review the request.</p>
+      `,
+    });
+  }
+} catch (error) {
+  console.error("[leave email] Could not notify admins:", error);
+}
   revalidatePath("/dashboard");
   revalidatePath("/my-leave");
   revalidatePath("/calendar");

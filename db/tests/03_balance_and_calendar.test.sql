@@ -31,60 +31,98 @@ select pg_temp.eq((app.calc_leave_days('2026-09-18', '2026-09-22') ->> 'leaveDay
   'worked example: 3 working days deducted');
 
 -- A range that includes a Bank of Thailand holiday on a working day.
--- 'a BOT holiday falling on a working day is not deducted'
 -- 12–13 Oct 2026 = Mon + Tue, and 13 Oct is a BOT public holiday.
 select pg_temp.eq(
   (app.calc_leave_days('2026-10-12', '2026-10-13') ->> 'leaveDays')::int,
   1,
   'a BOT holiday falling on a working day is not deducted');
+
 select pg_temp.eq(
   (app.calc_leave_days('2026-10-12', '2026-10-13') -> 'holidays' -> 0 ->> 'name'),
-  'H.M. King Bhumibol Adulyadej the Great Memorial Day',
+  'H.M. King Bhumibol Adulyadej The Great Memorial Day',
   'the breakdown names the holiday that was excluded');
+
 select pg_temp.eq(
   (app.calc_leave_days('2026-10-12', '2026-10-13') -> 'holidays' -> 0 ->> 'source'),
-  'BOT', 'the breakdown records the holiday source as BOT');
+  'BOT',
+  'the breakdown records the holiday source as BOT');
 
 -- Whole-year sanity: 2026 has 20 seeded BOT holidays.
-select pg_temp.eq((select count(*) from holidays where year = 2026 and active)::int, 20,
+select pg_temp.eq(
+  (select count(*) from holidays where year = 2026 and active)::int,
+  20,
   '20 Bank of Thailand holidays are loaded for 2026');
 
 -- ---------------------------------------------------------------------------
 -- Only APPROVED leave reduces the official balance (§10)
 -- ---------------------------------------------------------------------------
--- Mike: 12 entitlement. Approved 1 (Mar) + 2 (Aug) = 3. He also has a
--- CANCELLED 2-day request that must be ignored entirely.
-select pg_temp.eq((select remaining from app.leave_balance(:'mike'::uuid, 2026)), 0::numeric,
+
+-- Mike: entitlement 12.
+-- Approved: 1 day (Mar) + 2 days (Aug) = 3.
+-- Cancelled 2-day leave is ignored.
+-- remaining = 12 - 3 = 9.
+select pg_temp.eq(
+  (select remaining from app.leave_balance(:'mike'::uuid, 2026)),
+  9::numeric,
   'cancelled leave does not reduce the balance');
 
--- Jane: approved 6, plus a REJECTED 1-day request that must be ignored.
-select pg_temp.eq((select remaining from app.leave_balance(:'jane'::uuid, 2026)), 4::numeric,
+-- Jane: entitlement 15.
+-- Approved: 7 days (Jun) + 3 days (Sep) = 10.
+-- Rejected 1-day leave is ignored.
+-- remaining = 15 - 10 = 5.
+select pg_temp.eq(
+  (select remaining from app.leave_balance(:'jane'::uuid, 2026)),
+  5::numeric,
   'rejected leave does not reduce the balance');
 
--- Pending is reserved but not spent.
-select pg_temp.eq((select remaining from app.leave_balance(:'john'::uuid, 2026)), 13::numeric,
-  'pending leave does NOT reduce the official remaining balance');
-select pg_temp.eq((select available from app.leave_balance(:'john'::uuid, 2026)), 10::numeric,
-  'pending leave IS reserved against what can still be booked');
-
--- Approving moves days from pending into approved.
-update leave_requests set status = 'approved'
- where employee_id = :'john'::uuid and status = 'pending';
+-- John: entitlement 20.
+-- Approved: 2 days.
+-- Pending: 7 days.
+-- remaining = 20 - 2 = 18.
+-- available = 20 - 2 - 7 = 11.
 select pg_temp.eq(
   (select remaining from app.leave_balance(:'john'::uuid, 2026)),
-  10::numeric,
-  'approving 3 pending days drops remaining from 13 to 10');
-select pg_temp.eq((select pending from app.leave_balance(:'john'::uuid, 2026)), 0::numeric,
+  18::numeric,
+  'pending leave does NOT reduce the official remaining balance');
+
+select pg_temp.eq(
+  (select available from app.leave_balance(:'john'::uuid, 2026)),
+  11::numeric,
+  'pending leave IS reserved against what can still be booked');
+
+-- Approving the 7 pending days moves them from pending into approved.
+-- Approved becomes 2 + 7 = 9.
+-- remaining = 20 - 9 = 11.
+update leave_requests
+set status = 'approved'
+where employee_id = :'john'::uuid
+  and status = 'pending';
+
+select pg_temp.eq(
+  (select remaining from app.leave_balance(:'john'::uuid, 2026)),
+  11::numeric,
+  'approving 7 pending days drops remaining from 18 to 11');
+
+select pg_temp.eq(
+  (select pending from app.leave_balance(:'john'::uuid, 2026)),
+  0::numeric,
   'nothing is left pending afterwards');
 
 -- ---------------------------------------------------------------------------
 -- Entitlement changes flow straight through (§10)
 -- ---------------------------------------------------------------------------
-update leave_entitlements set total_days = 25 where employee_id = :'john'::uuid and year = 2026;
+
+-- John now has 9 approved days.
+-- Raising entitlement to 25 gives remaining = 25 - 9 = 16.
+update leave_entitlements
+set total_days = 25
+where employee_id = :'john'::uuid
+  and year = 2026;
+
 select pg_temp.eq(
   (select remaining from app.leave_balance(:'john'::uuid, 2026)),
-  15::numeric,
-  'raising the entitlement to 25 raises remaining to 15');
+  16::numeric,
+  'raising the entitlement to 25 raises remaining to 16');
 
 -- ---------------------------------------------------------------------------
 -- Balance is re-checked at APPROVAL time, not only at submission (§11)
@@ -103,8 +141,10 @@ select pg_temp.eq(
    where employee_id = :'mike'::uuid and reason = 'Long break'),
   16::numeric,
   'the 16 Nov - 8 Dec range costs 16 days (17 working days minus one BOT holiday)');
-select pg_temp.eq((select available from app.leave_balance(:'mike'::uuid, 2026)), 2::numeric,
-  'Mike has 2 bookable days left after that 16-day pending request');
+select pg_temp.eq(
+  (select available from app.leave_balance(:'mike'::uuid, 2026)),
+  11::numeric,
+  'Mike has 11 bookable days left after that 16-day pending request');
 
 select pg_temp.act_as(:'admin');
 -- HR now cuts Mike's entitlement below what is already pending.

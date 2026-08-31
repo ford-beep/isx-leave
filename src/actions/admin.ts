@@ -8,7 +8,8 @@
  * error — the actual enforcement is the RLS policy set, which would reject
  * these statements for a non-admin even if this guard were deleted.
  */
-
+import { sendEmail } from "@/lib/email";
+import { getRequestById } from "@/lib/queries";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
@@ -30,15 +31,61 @@ function revalidateAdmin() {
 
 /* ------------------------------------------------------- leave decisions */
 
-export async function approveLeaveAction(_prev: AdminFormState, formData: FormData): Promise<AdminFormState> {
+export async function approveLeaveAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
   const me = await requireAdmin();
   const id = String(formData.get("id") ?? "");
-  if (!id) return { ok: false, message: "Missing request id." };
+
+  if (!id) {
+    return { ok: false, message: "Missing request id." };
+  }
+
   try {
     const res = await withUser(me.id, (db) =>
-      db.query("update leave_requests set status = 'approved' where id = $1 and status = 'pending'", [id]));
-    if (res.rowCount === 0) return { ok: false, message: "That request is no longer pending." };
-  } catch (e) { return fail(e); }
+      db.query(
+        "update leave_requests set status = 'approved' where id = $1 and status = 'pending'",
+        [id],
+      ),
+    );
+
+    if (res.rowCount === 0) {
+      return { ok: false, message: "That request is no longer pending." };
+    }
+  } catch (e) {
+    return fail(e);
+  }
+
+  try {
+    const request = await getRequestById(me.id, id);
+
+    if (
+      request?.employeeEmail &&
+      !request.employeeEmail.endsWith("@demo.isx.local")
+    ) {
+      await sendEmail({
+        to: request.employeeEmail,
+        subject: "Your leave request was approved",
+        html: `
+          <h2>Leave approved</h2>
+          <p>Hi ${request.employeeName ?? "there"},</p>
+          <p>Your leave request has been approved.</p>
+
+          <p>
+            <strong>Start:</strong> ${request.startDate}<br />
+            <strong>End:</strong> ${request.endDate}<br />
+            <strong>Days:</strong> ${request.leaveDays}
+          </p>
+
+          <p>You can view the request in ISX Leave.</p>
+        `,
+      });
+    }
+  } catch (error) {
+    console.error("[leave email] Could not notify employee of approval:", error);
+  }
+
   revalidateAdmin();
   return ok("Leave approved. The employee has been notified.");
 }
@@ -48,25 +95,92 @@ const rejectSchema = z.object({
   reason: z.string().trim().min(3, "Please provide a reason for rejecting this request.").max(1000),
 });
 
-export async function rejectLeaveAction(_prev: AdminFormState, formData: FormData): Promise<AdminFormState> {
+export async function rejectLeaveAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
   const me = await requireAdmin();
+
   const parsed = rejectSchema.safeParse({
     id: String(formData.get("id") ?? ""),
     reason: String(formData.get("reason") ?? ""),
   });
+
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
-    return { ok: false, message: issue.message, field: String(issue.path[0]) };
+    return {
+      ok: false,
+      message: issue.message,
+      field: String(issue.path[0]),
+    };
   }
+
   try {
-    const res = await withUser(me.id, (db) => db.query(
-      `update leave_requests set status = 'rejected', rejection_reason = $2
-        where id = $1 and status = 'pending'`, [parsed.data.id, parsed.data.reason]));
-    if (res.rowCount === 0) return { ok: false, message: "That request is no longer pending." };
-  } catch (e) { return fail(e); }
+    const res = await withUser(me.id, (db) =>
+      db.query(
+        `update leave_requests
+         set status = 'rejected',
+             rejection_reason = $2
+         where id = $1
+           and status = 'pending'`,
+        [parsed.data.id, parsed.data.reason],
+      ),
+    );
+
+    if (res.rowCount === 0) {
+      return {
+        ok: false,
+        message: "That request is no longer pending.",
+      };
+    }
+  } catch (e) {
+    return fail(e);
+  }
+
+  // Email notification is best-effort:
+  // rejecting the leave must still succeed if email delivery fails.
+  try {
+    const request = await getRequestById(me.id, parsed.data.id);
+
+    if (
+      request?.employeeEmail &&
+      !request.employeeEmail.endsWith("@demo.isx.local")
+    ) {
+      await sendEmail({
+        to: request.employeeEmail,
+        subject: "Your leave request was rejected",
+        html: `
+          <h2>Leave request rejected</h2>
+
+          <p>Hi ${request.employeeName ?? "there"},</p>
+
+          <p>Your leave request was not approved.</p>
+
+          <p>
+            <strong>Start:</strong> ${request.startDate}<br />
+            <strong>End:</strong> ${request.endDate}<br />
+            <strong>Days:</strong> ${request.leaveDays}<br />
+            <strong>Reason:</strong> ${parsed.data.reason}
+          </p>
+
+          <p>You can view the request in ISX Leave.</p>
+        `,
+      });
+    }
+  } catch (error) {
+    console.error(
+      "[leave email] Could not notify employee of rejection:",
+      error,
+    );
+  }
+
   revalidateAdmin();
-  return ok("Leave rejected. The employee has been notified with your reason.");
+
+  return ok(
+    "Leave rejected. The employee has been notified with your reason.",
+  );
 }
+
 
 /** Admin override — withdraw a request on an employee's behalf. */
 export async function adminCancelLeaveAction(_prev: AdminFormState, formData: FormData): Promise<AdminFormState> {

@@ -96,28 +96,34 @@ select pg_temp.raises(
   'LEAVE_IMMUTABLE_AFTER_SUBMIT', 'nobody can hand-edit the calculated day count');
 
 -- ---------------------------------------------------------------------------
--- State machine (§7)
+-- State machine (§7) — leave status changes are admin-only
 -- ---------------------------------------------------------------------------
+
 select pg_temp.raises(
   'update leave_requests set status = ''approved''
    where employee_id = ''22222222-2222-4222-8222-222222222222'' and reason = ''Test A''',
-  'LEAVE_INVALID_TRANSITION', 'an employee cannot approve their own request');
+  'LEAVE_STATUS_CHANGE_ADMIN_ONLY',
+  'an employee cannot approve their own request');
 
 select pg_temp.raises(
   'update leave_requests set status = ''rejected'', rejection_reason = ''nope''
    where employee_id = ''22222222-2222-4222-8222-222222222222'' and reason = ''Test A''',
-  'LEAVE_INVALID_TRANSITION', 'an employee cannot reject a request');
+  'LEAVE_STATUS_CHANGE_ADMIN_ONLY',
+  'an employee cannot reject a request');
 
--- Employees MAY withdraw their own pending request.
-update leave_requests set status = 'cancelled'
- where employee_id = :'jane'::uuid and reason = 'Test A';
+select pg_temp.raises(
+  'update leave_requests set status = ''cancelled''
+   where employee_id = ''22222222-2222-4222-8222-222222222222'' and reason = ''Test A''',
+  'LEAVE_STATUS_CHANGE_ADMIN_ONLY',
+  'an employee cannot cancel their own pending request');
+
 select pg_temp.eq(
-  (select status::text from leave_requests where employee_id = :'jane'::uuid and reason = 'Test A'),
-  'cancelled', 'an employee can cancel their own pending request');
-select pg_temp.ok(
-  (select cancelled_at is not null from leave_requests
-    where employee_id = :'jane'::uuid and reason = 'Test A'),
-  'cancelling stamps cancelled_at automatically');
+  (select status::text
+     from leave_requests
+    where employee_id = :'jane'::uuid
+      and reason = 'Test A'),
+  'pending',
+  'the request remains pending after the employee cancellation attempt');
 
 -- …but not one that has already been decided. The RLS USING clause only
 -- exposes still-pending rows for UPDATE, so this silently matches nothing

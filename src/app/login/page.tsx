@@ -9,9 +9,17 @@ export const dynamic = "force-dynamic";
 export default async function LoginPage({
   searchParams,
 }: { searchParams: Promise<{ reason?: string }> }) {
-  const user = await getSessionUser();
-  if (user) redirect(user.role === "admin" ? "/admin" : "/dashboard");
   const { reason } = await searchParams;
+
+  // If the user was redirected here because the stored session no longer
+  // matches an active account, allow the login page to render so a new login
+  // can replace the stale cookie.
+  if (reason !== "inactive") {
+    const user = await getSessionUser();
+    if (user) {
+      redirect(user.role === "admin" ? "/admin" : "/dashboard");
+    }
+  }
 
   return (
     <div className="auth-wrap">

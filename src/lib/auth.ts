@@ -65,10 +65,9 @@ export async function requireUser(): Promise<SessionUser> {
     (await db.query<{ id: string; role: Role; name: string; active: boolean }>(
       "SELECT id, role, name, active FROM users WHERE id = $1", [user.id])).rows);
 
-  if (!rows[0] || !rows[0].active) {
-    await destroySession();
-    redirect("/login?reason=inactive");
-  }
+if (!rows[0] || !rows[0].active) {
+  redirect("/login?reason=inactive");
+}
   return { ...user, role: rows[0].role, name: rows[0].name };
 }
 

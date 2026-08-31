@@ -108,22 +108,41 @@ on conflict (employee_id, year) do update
   set total_days = excluded.total_days, note = excluded.note;
 
 -- --------------------------------------------------------------------------
--- Leave requests — inserted as the employee, decided as the admin, exactly
--- like the running application does it.
+-- Leave requests — normal advance leave is submitted as the employee.
+-- Historical/emergency fixtures inside the 7-day window are entered by
+-- the admin, matching the application's emergency-leave workflow.
 -- --------------------------------------------------------------------------
+
 create or replace function pg_temp.as_user(p uuid) returns void
-language sql as $$ select set_config('app.current_user_id', p::text, true); $$;
+language sql as $$
+  select set_config('app.current_user_id', p::text, true);
+$$;
 
 create or replace function pg_temp.submit(
   p_emp uuid, p_type text, p_start date, p_end date, p_reason text
 ) returns uuid
 language plpgsql as $$
-declare new_id uuid;
+declare
+  new_id uuid;
+  admin_id uuid := '11111111-1111-4111-8111-111111111111';
+  today_bangkok date := (now() at time zone 'Asia/Bangkok')::date;
 begin
-  perform pg_temp.as_user(p_emp);
-  insert into public.leave_requests (employee_id, leave_type, start_date, end_date, reason)
+  if p_start < today_bangkok + 7 then
+    perform pg_temp.as_user(admin_id);
+  else
+    perform pg_temp.as_user(p_emp);
+  end if;
+
+  insert into public.leave_requests (
+    employee_id,
+    leave_type,
+    start_date,
+    end_date,
+    reason
+  )
   values (p_emp, p_type, p_start, p_end, p_reason)
   returning id into new_id;
+
   return new_id;
 end $$;
 
@@ -178,10 +197,9 @@ begin
   r := pg_temp.submit(mike, 'annual', '2026-08-17', '2026-08-18', 'Short break');
   perform pg_temp.decide(admin_id, r, 'approved');
 
-  -- Cancelled by the employee — must NOT consume any balance.
-  r := pg_temp.submit(mike, 'annual', '2026-11-09', '2026-11-10', 'Plans changed');
-  perform pg_temp.as_user(mike);
-  update public.leave_requests set status = 'cancelled' where id = r;
+  -- Cancelled by an admin — must NOT consume any balance.
+r := pg_temp.submit(mike, 'annual', '2026-11-09', '2026-11-10', 'Plans changed');
+perform pg_temp.decide(admin_id, r, 'cancelled');
 
   perform set_config('app.current_user_id', '', true);
 end $$;

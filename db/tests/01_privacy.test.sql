@@ -75,8 +75,8 @@ select pg_temp.eq((select entitlement from app.leave_balance(:'john'::uuid, 2026
   'Jane calling leave_balance(John) gets only the public default, not John''s 20 days');
 select pg_temp.eq((select approved from app.leave_balance(:'john'::uuid, 2026)), 0::numeric,
   'Jane calling leave_balance(John) sees 0 approved days (no leakage)');
-select pg_temp.eq((select approved from app.leave_balance(:'jane'::uuid, 2026)), 11::numeric,
-  'Jane calling leave_balance(self) sees her real 11 approved days');
+select pg_temp.eq((select approved from app.leave_balance(:'jane'::uuid, 2026)), 10::numeric,
+  'Jane calling leave_balance(self) sees her real 10 approved days');
 
 -- ---------------------------------------------------------------------------
 -- 5. Employee cannot WRITE to anyone else's data
