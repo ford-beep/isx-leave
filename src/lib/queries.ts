@@ -12,7 +12,7 @@ import "server-only";
 import { withUser, queryAs, oneAs, type Db } from "./db";
 import { companyToday } from "./date";
 import type {
-  AuditEntry, Holiday, LeaveBalance, LeaveRequest, LeaveType,
+  AuditEntry, CompDayBalance, Holiday, LeaveBalance, LeaveRequest, LeaveType,
   Notification, OfficeDayConfig, UserRow, WorkScheduleDay,
 } from "./types";
 import type { LeaveCalculation } from "./types";
@@ -157,6 +157,28 @@ export async function getBalance(me: string, employeeId: string, year: number): 
        from app.leave_balance($1, $2)`, [employeeId, year]);
   return {
     entitlement: Number(r?.entitlement ?? 0),
+    approved: Number(r?.approved ?? 0),
+    pending: Number(r?.pending ?? 0),
+    remaining: Number(r?.remaining ?? 0),
+    available: Number(r?.available ?? 0),
+  };
+}
+
+export async function getCompDayBalance(
+  me: string,
+  employeeId: string,
+  year: number,
+): Promise<CompDayBalance> {
+  const r = await oneAs<Record<string, any>>(
+    me,
+    `select earned::float8, approved::float8, pending::float8,
+            remaining::float8, available::float8
+       from app.comp_day_balance($1, $2)`,
+    [employeeId, year],
+  );
+
+  return {
+    earned: Number(r?.earned ?? 0),
     approved: Number(r?.approved ?? 0),
     pending: Number(r?.pending ?? 0),
     remaining: Number(r?.remaining ?? 0),

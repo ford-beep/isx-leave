@@ -1,6 +1,10 @@
 import { requireUser } from "@/lib/auth";
 import { companyToday, WEEKDAY_NAMES } from "@/lib/date";
-import { getBalance, getOfficeDays } from "@/lib/queries";
+import {
+  getBalance,
+  getCompDayBalance,
+  getOfficeDays,
+} from "@/lib/queries";
 import { RequestForm } from "@/components/RequestForm";
 
 export const dynamic = "force-dynamic";
@@ -10,9 +14,10 @@ export default async function RequestPage() {
   const today = companyToday();
   const year = Number(today.slice(0, 4));
 
-  const [balance, office] = await Promise.all([
-  getBalance(me.id, me.id, year),
-  getOfficeDays(me.id),
+  const [balance, compDayBalance, office] = await Promise.all([
+    getBalance(me.id, me.id, year),
+    getCompDayBalance(me.id, me.id, year),
+    getOfficeDays(me.id),
   ]);
 
   return (
@@ -20,14 +25,30 @@ export default async function RequestPage() {
       <div className="page-head">
         <div className="grow">
           <h1>Request leave</h1>
-          <p className="muted">You have <b>{balance.available} day{balance.available === 1 ? "" : "s"}</b> available to book in {year}.</p>
+          <p className="muted">
+            Annual Leave available:{" "}
+            <b>
+              {balance.available} day
+              {balance.available === 1 ? "" : "s"}
+            </b>
+            {" · "}
+            Comp Days available:{" "}
+            <b>
+              {compDayBalance.available} day
+              {compDayBalance.available === 1 ? "" : "s"}
+            </b>
+            {" "}in {year}.
+          </p>
         </div>
       </div>
 
       <RequestForm
         balance={balance}
+        compDayBalance={compDayBalance}
         today={today}
-        officeDayNames={office.weekdays.map((d) => WEEKDAY_NAMES[d]).join(" + ")}
+        officeDayNames={office.weekdays
+          .map((d) => WEEKDAY_NAMES[d])
+          .join(" + ")}
       />
     </>
   );

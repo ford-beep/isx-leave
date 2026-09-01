@@ -81,6 +81,14 @@ export interface LeaveBalance {
   available: number;
 }
 
+export interface CompDayBalance {
+  earned: number;
+  approved: number;
+  pending: number;
+  remaining: number;
+  available: number;
+}
+
 export interface Holiday {
   id: string;
   date: ISODate;

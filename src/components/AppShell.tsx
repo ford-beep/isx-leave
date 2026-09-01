@@ -41,6 +41,17 @@ export function AppShell({ user, pendingCount, notifications, unread, children }
               <NavLink href="/admin" icon={<IconShield size={16} />} exact>Admin dashboard</NavLink>
               <NavLink href="/admin/requests" icon={<IconList size={16} />} count={pendingCount}>Leave requests</NavLink>
               <NavLink href="/admin/employees" icon={<IconUsers size={16} />}>Employees</NavLink>
+              <NavLink href="/admin/employees" icon={<IconUsers size={16} />}>
+  Employees
+</NavLink>
+
+<NavLink href="/admin/comp-days" icon={<IconPlus size={16} />}>
+  Comp Days
+</NavLink>
+
+<NavLink href="/admin/calendar" icon={<IconCalendar size={16} />}>
+  Company calendar
+</NavLink>
               <NavLink href="/admin/calendar" icon={<IconCalendar size={16} />}>Company calendar</NavLink>
               <NavLink href="/admin/settings" icon={<IconSettings size={16} />}>Settings</NavLink>
               <NavLink href="/admin/audit" icon={<IconFile size={16} />}>Audit log</NavLink>

@@ -148,6 +148,13 @@ export function MobileMenu({
                   </NavLink>
 
                   <NavLink
+  href="/admin/comp-days"
+  icon={<IconPlus size={16} />}
+>
+  Comp Days
+</NavLink>
+
+                  <NavLink
                     href="/admin/settings"
                     icon={<IconSettings size={16} />}
                   >
