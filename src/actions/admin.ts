@@ -502,21 +502,89 @@ export async function setWorkModeAction(
   }
 
   if (mode !== "office" && mode !== "wfh") {
-    return { ok: false, message: "Work mode must be Office or WFH." };
+    return {
+      ok: false,
+      message: "Work mode must be Office or WFH.",
+    };
   }
 
   try {
-    await withUser(me.id, (db) =>
-      db.query(
-        `insert into work_schedule (work_date, mode)
-         values ($1::date, $2::work_mode)
-         on conflict (work_date)
-         do update set
-           mode = excluded.mode,
-           updated_at = now()`,
+    await withUser(me.id, async (db) => {
+      // Read the effective mode BEFORE applying the override.
+      // If this date has no manual override yet, fall back to
+      // the normal Office/WFH schedule.
+      const previousResult = await db.query<{
+        mode: "office" | "wfh";
+      }>(
+        `
+        select mode
+        from public.work_schedule
+        where work_date = $1::date
+        `,
+        [date],
+      );
+
+      let previousMode: "office" | "wfh";
+
+      if (previousResult.rows[0]) {
+        previousMode = previousResult.rows[0].mode;
+      } else {
+        const defaultResult = await db.query<{
+          is_office: boolean;
+        }>(
+          `
+          select app.is_office_day($1::date) as is_office
+          `,
+          [date],
+        );
+
+        previousMode = defaultResult.rows[0]?.is_office
+          ? "office"
+          : "wfh";
+      }
+
+      // Nothing actually changed → don't create a fake audit event.
+      if (previousMode === mode) {
+        return;
+      }
+
+      const result = await db.query<{
+        id: string;
+      }>(
+        `
+        insert into public.work_schedule (work_date, mode)
+        values ($1::date, $2::work_mode)
+        on conflict (work_date)
+        do update set
+          mode = excluded.mode,
+          updated_at = now()
+        returning id
+        `,
         [date, mode],
-      ),
-    );
+      );
+
+      const scheduleId = result.rows[0]?.id;
+
+      if (!scheduleId) {
+        throw new Error("Could not determine work schedule id.");
+      }
+
+      await db.query(
+        `
+        select app.write_audit(
+          'work_schedule.updated',
+          'work_schedule',
+          $1::uuid,
+          jsonb_build_object(
+            'date', $2::date,
+            'from_mode', $3::text,
+            'to_mode', $4::text
+          )
+        )
+        `,
+        [scheduleId, date, previousMode, mode],
+      );
+    });
   } catch (e) {
     return fail(e);
   }

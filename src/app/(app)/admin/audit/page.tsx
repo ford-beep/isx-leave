@@ -20,6 +20,8 @@ const ACTION_LABEL: Record<string, string> = {
   "office_day.insert": "changed office working days",
   "office_day.update": "changed office working days",
   "holiday.insert": "added a holiday",
+  "work_schedule.updated": "changed work mode",
+  "office_day.schedule_updated": "changed office working days",
   "holiday.update": "updated a holiday",
   "leave_type.insert": "added a leave type",
   "leave_type.update": "updated a leave type",
@@ -36,6 +38,69 @@ function summarise(action: string, metadata: Record<string, unknown>): string {
       .filter(Boolean);
     return bits.join(" · ");
   }
+
+  if (action === "work_schedule.updated") {
+  const date = m.date;
+  const fromMode =
+    m.from_mode === "office"
+      ? "Office"
+      : m.from_mode === "wfh"
+        ? "WFH"
+        : m.from_mode;
+
+  const toMode =
+    m.to_mode === "office"
+      ? "Office"
+      : m.to_mode === "wfh"
+        ? "WFH"
+        : m.to_mode;
+
+  return [
+    date,
+    fromMode && toMode && `${fromMode} → ${toMode}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+if (action === "office_day.schedule_updated") {
+  const dayNames = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+  ];
+
+  const before = Array.isArray(metadata.before_weekdays)
+    ? metadata.before_weekdays
+        .map((d) => dayNames[Number(d)])
+        .filter(Boolean)
+        .join(", ")
+    : "";
+
+  const after = Array.isArray(metadata.after_weekdays)
+    ? metadata.after_weekdays
+        .map((d) => dayNames[Number(d)])
+        .filter(Boolean)
+        .join(", ")
+    : "";
+
+  const effectiveFrom =
+    typeof metadata.effective_from === "string"
+      ? metadata.effective_from
+      : "";
+
+  return [
+    effectiveFrom && `Effective ${effectiveFrom}`,
+    `${before || "None"} → ${after || "None"}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
   if (m.after && typeof m.after === "object") {
     const a = m.after as Record<string, unknown>;
     return [a.name, a.email, a.total_days !== undefined && `${a.total_days} days`,
@@ -71,6 +136,7 @@ export default async function AuditPage({
             { value: "user", label: "Employees" },
             { value: "leave_entitlement", label: "Entitlements" },
             { value: "office_day", label: "Office days" },
+            { value: "work_schedule", label: "Work schedule" },
             { value: "holiday", label: "Holidays" },
           ]}
         />
