@@ -7,3 +7,8 @@ node_modules
 test-results
 screenshots
 tsconfig.tsbuildinfo
+.vercel
+.env*
+# Historical leave import data
+data/historical-leave-2026.json
+data/historical-leave-2026.before-date-fix.json

@@ -38,6 +38,41 @@ export function EmployeeSettingsForms({ employee, entitlements, currentYear, isS
             <Field label="Job title" htmlFor="jobTitle">
               <input id="jobTitle" name="jobTitle" className="input" defaultValue={employee.jobTitle ?? ""} />
             </Field>
+            <Field label="Full name" htmlFor="name">
+  <input
+    id="name"
+    name="name"
+    className="input"
+    defaultValue={employee.name}
+    required
+  />
+</Field>
+
+<Field label="Job title" htmlFor="jobTitle">
+  <input
+    id="jobTitle"
+    name="jobTitle"
+    className="input"
+    defaultValue={employee.jobTitle ?? ""}
+  />
+</Field>
+
+<Field
+  label="Birthday"
+  htmlFor="birthday"
+  hint="Managed by administrators."
+>
+  <input
+    id="birthday"
+    name="birthday"
+    type="date"
+    className="input"
+    max={new Date().toISOString().slice(0, 10)}
+    defaultValue={employee.birthday ?? ""}
+  />
+</Field>
+
+<div className="form-grid"></div>
             <div className="form-grid">
               <Field label="Role" htmlFor="role"
                 hint={isSelf ? "You can't change your own role." : undefined}>

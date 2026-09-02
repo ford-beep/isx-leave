@@ -12,8 +12,17 @@ import "server-only";
 import { withUser, queryAs, oneAs, type Db } from "./db";
 import { companyToday } from "./date";
 import type {
-  AuditEntry, CompDayBalance, Holiday, LeaveBalance, LeaveRequest, LeaveType,
-  Notification, OfficeDayConfig, UserRow, WorkScheduleDay,
+  AuditEntry,
+  CompDayBalance,
+  CompDayCredit,
+  Holiday,
+  LeaveBalance,
+  LeaveRequest,
+  LeaveType,
+  Notification,
+  OfficeDayConfig,
+  UserRow,
+  WorkScheduleDay,
 } from "./types";
 import type { LeaveCalculation } from "./types";
 
@@ -21,6 +30,7 @@ import type { LeaveCalculation } from "./types";
 
 const REQUEST_COLUMNS = `
   lr.id, lr.employee_id, lr.leave_type, lt.label as leave_type_label,
+  lr.leave_session,
   lr.start_date::text as start_date, lr.end_date::text as end_date,
   lr.leave_days::float8 as leave_days, lr.reason, lr.status,
   lr.rejection_reason, lr.approved_at, lr.created_at, lr.calc_breakdown,
@@ -42,6 +52,7 @@ function mapRequest(r: any): LeaveRequest {
     employeeEmail: r.employee_email,
     leaveType: r.leave_type,
     leaveTypeLabel: r.leave_type_label,
+    leaveSession: r.leave_session,
     startDate: r.start_date,
     endDate: r.end_date,
     leaveDays: Number(r.leave_days),
@@ -186,6 +197,46 @@ export async function getCompDayBalance(
   };
 }
 
+export async function getCompDayCredits(
+  me: string,
+  employeeId: string,
+  year: number,
+): Promise<CompDayCredit[]> {
+  const rows = await queryAs<Record<string, any>>(
+    me,
+    `
+      select
+        c.id,
+        c.employee_id,
+        c.earned_date::text as earned_date,
+        c.note,
+        c.created_by,
+        creator.name as created_by_name,
+        c.created_at
+      from comp_day_credits c
+      left join users creator
+        on creator.id = c.created_by
+      where c.employee_id = $1
+        and c.earned_year = $2
+      order by c.earned_date desc, c.created_at desc
+    `,
+    [employeeId, year],
+  );
+
+  return rows.map((r) => ({
+    id: r.id,
+    employeeId: r.employee_id,
+    earnedDate: r.earned_date,
+    note: r.note,
+    createdBy: r.created_by,
+    createdByName: r.created_by_name ?? null,
+    createdAt:
+      r.created_at instanceof Date
+        ? r.created_at.toISOString()
+        : String(r.created_at),
+  }));
+}
+
 /* --------------------------------------------------------- leave requests */
 
 export async function getMyRequests(me: string, limit?: number): Promise<LeaveRequest[]> {
@@ -267,17 +318,41 @@ export async function getRequestById(me: string, id: string): Promise<LeaveReque
   return rows[0] ? mapRequest(rows[0]) : null;
 }
 
-export async function getUser(me: string, id: string): Promise<UserRow | null> {
-  const r = await oneAs<Record<string, any>>(me,
-    `select id, name, email, role, active, job_title, created_at from users where id = $1`, [id]);
-  return r ? {
-    id: r.id, name: r.name, email: r.email, role: r.role,
-    active: r.active,
-    jobTitle: r.job_title,
-    createdAt: r.created_at instanceof Date
-  ? r.created_at.toISOString()
-  : String(r.created_at), 
-  } : null;
+export async function getUser(
+  me: string,
+  id: string,
+): Promise<UserRow | null> {
+  const r = await oneAs<Record<string, any>>(
+    me,
+    `select
+       id,
+       name,
+       email,
+       role,
+       active,
+       job_title,
+       birthday::text as birthday,
+       created_at
+     from users
+     where id = $1`,
+    [id],
+  );
+
+  return r
+    ? {
+        id: r.id,
+        name: r.name,
+        email: r.email,
+        role: r.role,
+        active: r.active,
+        jobTitle: r.job_title,
+        birthday: r.birthday ?? null,
+        createdAt:
+          r.created_at instanceof Date
+            ? r.created_at.toISOString()
+            : String(r.created_at),
+      }
+    : null;
 }
 
 export interface EmployeeOverview extends UserRow {
@@ -290,13 +365,14 @@ export interface EmployeeOverview extends UserRow {
 /** Roster with balances. Employees see only themselves; admins see everyone. */
 export async function getEmployeeOverview(me: string, year: number): Promise<EmployeeOverview[]> {
   const rows = await queryAs<Record<string, any>>(me,
-    `select u.id, u.name, u.email, u.role, u.active, u.job_title, u.created_at,
+    `select u.id, u.name, u.email, u.role, u.active, u.job_title,
+       u.birthday::text as birthday, u.created_at,
             b.entitlement::float8, b.approved::float8, b.pending::float8, b.remaining::float8
        from users u, lateral app.leave_balance(u.id, $1) b
       order by u.active desc, u.name`, [year]);
   return rows.map((r) => ({
     id: r.id, name: r.name, email: r.email, role: r.role, active: r.active,
-    jobTitle: r.job_title, createdAt: r.created_at,
+    jobTitle: r.job_title, birthday: r.birthday ?? null, createdAt: r.created_at,
     entitlement: Number(r.entitlement), used: Number(r.approved),
     pending: Number(r.pending), remaining: Number(r.remaining),
   }));

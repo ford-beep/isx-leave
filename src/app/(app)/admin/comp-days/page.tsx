@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
 import { companyToday } from "@/lib/date";
 import {
@@ -60,80 +61,97 @@ export default async function CompDaysPage() {
         />
 
         <Card>
-          <CardHead
-            title="Comp Day balances"
-            sub={`Current balances for ${year}.`}
-          />
+  <CardHead
+    title="Comp Day balances"
+    sub={`Current balances for ${year}.`}
+  />
 
-          <div className="card-body">
-            {balances.length === 0 ? (
-              <p className="muted-sm">
-                No active employees found.
-              </p>
-            ) : (
-              <div className="stack">
-                {balances.map(
-                  ({ employee, balance }) => (
-                    <div
-                      key={employee.id}
-                      className="breakdown"
-                    >
-                      <div className="breakdown-row">
-                        <span className="lbl">
-                          <b>{employee.name}</b>
-                          <br />
-                          <span className="tiny">
-                            {employee.email}
-                          </span>
-                        </span>
+  <div className="card-body flush">
+    {balances.length === 0 ? (
+      <div style={{ padding: 20 }}>
+        <p className="muted-sm">
+          No active employees found.
+        </p>
+      </div>
+    ) : (
+      <div>
+        {balances.map(
+          ({ employee, balance }, index) => (
+            <Link
+              key={employee.id}
+              href={`/admin/comp-days/${employee.id}`}
+              style={{
+                display: "block",
+                padding: "16px 20px",
+                textDecoration: "none",
+                color: "inherit",
+                borderBottom:
+                  index === balances.length - 1
+                    ? "none"
+                    : "1px solid var(--border)",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 20,
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      marginBottom: 3,
+                    }}
+                  >
+                    {employee.name}
+                  </div>
 
-                        <span className="val">
-                          {balance.available} available
-                        </span>
-                      </div>
+                  <div className="tiny">
+                    {employee.email}
+                  </div>
 
-                      <div className="breakdown-row">
-                        <span className="lbl">
-                          Earned
-                        </span>
-                        <span className="val">
-                          {balance.earned}
-                        </span>
-                      </div>
+                  <div
+                    className="muted-sm"
+                    style={{ marginTop: 8 }}
+                  >
+                    Earned {balance.earned}
+                    {" · "}
+                    Used {balance.approved}
+                    {" · "}
+                    Pending {balance.pending}
+                  </div>
+                </div>
 
-                      <div className="breakdown-row">
-                        <span className="lbl">
-                          Approved / used
-                        </span>
-                        <span className="val">
-                          {balance.approved}
-                        </span>
-                      </div>
+                <div
+                  style={{
+                    flexShrink: 0,
+                    textAlign: "right",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      fontSize: 16,
+                    }}
+                  >
+                    {balance.available}
+                  </div>
 
-                      <div className="breakdown-row">
-                        <span className="lbl">
-                          Pending
-                        </span>
-                        <span className="val">
-                          {balance.pending}
-                        </span>
-                      </div>
-
-                      <div className="breakdown-row total">
-                        <span className="lbl">
-                          Available
-                        </span>
-                        <span className="val">
-                          {balance.available}
-                        </span>
-                      </div>
-                    </div>
-                  ),
-                )}
+                  <div className="tiny">
+                    available&nbsp;&nbsp;›
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
-        </Card>
+            </Link>
+          ),
+        )}
+      </div>
+    )}
+  </div>
+</Card>
       </div>
     </>
   );

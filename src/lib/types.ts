@@ -14,6 +14,7 @@ export interface SessionUser {
 export interface UserRow extends SessionUser {
   active: boolean;
   jobTitle: string | null;
+  birthday: ISODate | null;
   createdAt: string;
 }
 
@@ -59,6 +60,11 @@ export interface LeaveRequest {
   employeeEmail?: string;
   leaveType: string;
   leaveTypeLabel: string;
+  leaveSession:
+  | "full_day"
+  | "morning"
+  | "afternoon"
+  | "half_day";
   startDate: ISODate;
   endDate: ISODate;
   leaveDays: number;
@@ -87,6 +93,16 @@ export interface CompDayBalance {
   pending: number;
   remaining: number;
   available: number;
+}
+
+export interface CompDayCredit {
+  id: string;
+  employeeId: string;
+  earnedDate: ISODate;
+  note: string | null;
+  createdBy: string;
+  createdByName: string | null;
+  createdAt: string;
 }
 
 export interface Holiday {

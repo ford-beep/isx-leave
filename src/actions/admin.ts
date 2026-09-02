@@ -377,33 +377,78 @@ const updateEmployeeSchema = z.object({
   id: z.string().uuid(),
   name: z.string().trim().min(2).max(120),
   jobTitle: z.string().trim().max(120).optional(),
+  birthday: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
   role: z.enum(["employee", "admin"]),
   active: z.coerce.boolean(),
 });
 
-export async function updateEmployeeAction(_prev: AdminFormState, formData: FormData): Promise<AdminFormState> {
+export async function updateEmployeeAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
   const me = await requireAdmin();
+
   const parsed = updateEmployeeSchema.safeParse({
     id: String(formData.get("id") ?? ""),
     name: String(formData.get("name") ?? ""),
     jobTitle: String(formData.get("jobTitle") ?? "").trim() || undefined,
+    birthday:
+      String(formData.get("birthday") ?? "").trim() || undefined,
     role: String(formData.get("role") ?? "employee"),
-    active: formData.get("active") === "on" || formData.get("active") === "true",
+    active:
+      formData.get("active") === "on" ||
+      formData.get("active") === "true",
   });
-  if (!parsed.success) return { ok: false, message: "Please check the form and try again." };
+
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: "Please check the form and try again.",
+    };
+  }
+
   const d = parsed.data;
 
   // Guard against an admin locking themselves out of the admin area.
   if (d.id === me.id && (d.role !== "admin" || !d.active)) {
-    return { ok: false, message: "You can't remove your own admin access or deactivate yourself." };
+    return {
+      ok: false,
+      message:
+        "You can't remove your own admin access or deactivate yourself.",
+    };
   }
+
   try {
-    await withUser(me.id, (db) => db.query(
-      "update users set name = $2, job_title = $3, role = $4, active = $5 where id = $1",
-      [d.id, d.name, d.jobTitle ?? null, d.role, d.active]));
-  } catch (e) { return fail(e); }
+    await withUser(me.id, (db) =>
+      db.query(
+        `update users
+         set name = $2,
+             job_title = $3,
+             birthday = $4::date,
+             role = $5,
+             active = $6,
+             updated_at = now()
+         where id = $1`,
+        [
+          d.id,
+          d.name,
+          d.jobTitle ?? null,
+          d.birthday ?? null,
+          d.role,
+          d.active,
+        ],
+      ),
+    );
+  } catch (e) {
+    return fail(e);
+  }
+
   revalidateAdmin();
   revalidatePath(`/admin/employees/${d.id}`);
+
   return ok("Employee updated.");
 }
 

@@ -7,6 +7,21 @@ import { useActionToast } from "./Toast";
 import type { LeaveRequest } from "@/lib/types";
 import { formatRange } from "@/lib/date";
 
+function sessionLabel(
+  session: LeaveRequest["leaveSession"],
+) {
+  switch (session) {
+    case "morning":
+      return "Half Day · Morning";
+    case "afternoon":
+      return "Half Day · Afternoon";
+    case "half_day":
+      return "Half Day";
+    default:
+      return "Full Day";
+  }
+}
+
 export function AdminCancelLeave({
   request,
 }: {
@@ -25,10 +40,15 @@ export function AdminCancelLeave({
     setTimeout(() => setOpen(false), 0);
   }
 
-  const who = request.employeeName ?? "this employee";
-  const days = `${request.leaveDays} day${request.leaveDays === 1 ? "" : "s"}`;
+const who = request.employeeName ?? "this employee";
 
-  return (
+const days = `${request.leaveDays} day${
+  request.leaveDays === 1 ? "" : "s"
+}`;
+
+const session = sessionLabel(request.leaveSession);
+
+return (
     <>
       <button
         className="btn btn-sm btn-danger"
@@ -43,9 +63,9 @@ export function AdminCancelLeave({
         onClose={() => setOpen(false)}
         title={`Cancel ${who}'s approved leave?`}
         description={`${formatRange(
-          request.startDate,
-          request.endDate,
-        )} · ${days}. This will mark the leave as cancelled and restore the leave days to their balance.`}
+        request.startDate,
+         request.endDate,
+        )} · ${session} · ${days}. This will mark the leave as cancelled and restore the leave days to their balance.`}
         footer={
           <>
             <button

@@ -1,17 +1,40 @@
 "use client";
 
-import { useActionState, useEffect, useState, useTransition } from "react";
+import {
+  useActionState,
+  useEffect,
+  useState,
+  useTransition,
+} from "react";
 import { useRouter } from "next/navigation";
-import { previewLeaveAction, submitLeaveAction } from "@/actions/leave";
+import {
+  previewLeaveAction,
+  submitLeaveAction,
+} from "@/actions/leave";
 import { formatDate } from "@/lib/date";
 import type {
   CompDayBalance,
   LeaveBalance,
   LeaveCalculation,
 } from "@/lib/types";
-import { Alert, Card, CardHead, Field } from "./ui";
+import {
+  Alert,
+  Card,
+  CardHead,
+  Field,
+} from "./ui";
 import { useActionToast } from "./Toast";
-import { IconAlert, IconCheck } from "./icons";
+import {
+  IconAlert,
+  IconCheck,
+} from "./icons";
+
+type LeaveType = "annual" | "comp_day";
+
+type LeaveSession =
+  | "full_day"
+  | "morning"
+  | "afternoon";
 
 export function RequestForm({
   balance,
@@ -26,36 +49,61 @@ export function RequestForm({
 }) {
   const router = useRouter();
 
-  const [state, formAction, pending] = useActionState(
-    submitLeaveAction,
-    null,
-  );
+  const [state, formAction, pending] =
+    useActionState(
+      submitLeaveAction,
+      null,
+    );
 
   useActionToast(state);
 
-  const [leaveType, setLeaveType] = useState<"annual" | "comp_day">(
-    "annual",
-  );
+  const [leaveType, setLeaveType] =
+    useState<LeaveType>("annual");
 
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  const [leaveSession, setLeaveSession] =
+    useState<LeaveSession>("full_day");
 
-  const [calc, setCalc] = useState<LeaveCalculation | null>(null);
-  const [calcError, setCalcError] = useState<string | null>(null);
+  const [startDate, setStartDate] =
+    useState("");
 
-  const [calcPending, startCalc] = useTransition();
+  const [endDate, setEndDate] =
+    useState("");
+
+  const [calc, setCalc] =
+    useState<LeaveCalculation | null>(
+      null,
+    );
+
+  const [calcError, setCalcError] =
+    useState<string | null>(null);
+
+  const [calcPending, startCalc] =
+    useTransition();
+
+  const isHalfDay =
+    leaveSession === "morning" ||
+    leaveSession === "afternoon";
+
+  const isSingleDay =
+    leaveType === "comp_day" ||
+    isHalfDay;
 
   const earliestStartDate = (() => {
-    const d = new Date(`${today}T00:00:00+07:00`);
+    const d = new Date(
+      `${today}T00:00:00+07:00`,
+    );
 
     d.setDate(d.getDate() + 7);
 
-    return new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Asia/Bangkok",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(d);
+    return new Intl.DateTimeFormat(
+      "en-CA",
+      {
+        timeZone: "Asia/Bangkok",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      },
+    ).format(d);
   })();
 
   useEffect(() => {
@@ -66,21 +114,30 @@ export function RequestForm({
     }
 
     startCalc(async () => {
-      const res = await previewLeaveAction(
-        leaveType,
-        startDate,
-        endDate,
-      );
+      const res =
+        await previewLeaveAction(
+          leaveType,
+          leaveSession,
+          startDate,
+          endDate,
+        );
 
       if (res.ok) {
         setCalc(res.calc);
         setCalcError(null);
       } else {
         setCalc(null);
-        setCalcError(res.message);
+        setCalcError(
+          res.message,
+        );
       }
     });
-  }, [leaveType, startDate, endDate]);
+  }, [
+    leaveType,
+    leaveSession,
+    startDate,
+    endDate,
+  ]);
 
   useEffect(() => {
     if (state?.ok) {
@@ -94,13 +151,53 @@ export function RequestForm({
       : balance.available;
 
   const overBudget = calc
-    ? calc.leaveDays > availableBalance
+    ? calc.leaveDays >
+      availableBalance
     : false;
 
   const err = (field: string) =>
-    state && !state.ok && state.field === field
+    state &&
+    !state.ok &&
+    state.field === field
       ? state.message
       : undefined;
+
+  function changeLeaveType(
+    nextType: LeaveType,
+  ) {
+    setLeaveType(nextType);
+    setCalc(null);
+    setCalcError(null);
+
+    if (
+      nextType === "comp_day" &&
+      startDate
+    ) {
+      setEndDate(startDate);
+    }
+  }
+
+  function changeSession(
+    nextSession: LeaveSession,
+  ) {
+    setLeaveSession(nextSession);
+    setCalc(null);
+    setCalcError(null);
+
+    if (
+      nextSession !== "full_day" &&
+      startDate
+    ) {
+      setEndDate(startDate);
+    }
+
+    if (
+      leaveType === "comp_day" &&
+      startDate
+    ) {
+      setEndDate(startDate);
+    }
+  }
 
   return (
     <div className="grid-2">
@@ -117,13 +214,25 @@ export function RequestForm({
             value={leaveType}
           />
 
+          <input
+            type="hidden"
+            name="leaveSession"
+            value={leaveSession}
+          />
+
           <div className="card-body stack">
-            {state && !state.ok && !state.field && (
-              <Alert kind="error">
-                <IconAlert size={16} />
-                <span>{state.message}</span>
-              </Alert>
-            )}
+            {state &&
+              !state.ok &&
+              !state.field && (
+                <Alert kind="error">
+                  <IconAlert
+                    size={16}
+                  />
+                  <span>
+                    {state.message}
+                  </span>
+                </Alert>
+              )}
 
             <div className="form-grid">
               <Field
@@ -134,22 +243,12 @@ export function RequestForm({
                   id="leaveType"
                   className="input"
                   value={leaveType}
-                  onChange={(e) => {
-                    const nextType = e.target.value as
-                      | "annual"
-                      | "comp_day";
-
-                    setLeaveType(nextType);
-                    setCalc(null);
-                    setCalcError(null);
-
-                    if (
-                      nextType === "comp_day" &&
-                      startDate
-                    ) {
-                      setEndDate(startDate);
-                    }
-                  }}
+                  onChange={(e) =>
+                    changeLeaveType(
+                      e.target
+                        .value as LeaveType,
+                    )
+                  }
                 >
                   <option value="annual">
                     Annual Leave
@@ -162,13 +261,81 @@ export function RequestForm({
               </Field>
 
               <Field
+                label="Duration"
+                htmlFor="duration"
+              >
+                <select
+                  id="duration"
+                  className="input"
+                  value={
+                    isHalfDay
+                      ? "half_day"
+                      : "full_day"
+                  }
+                  onChange={(e) => {
+                    if (
+                      e.target.value ===
+                      "full_day"
+                    ) {
+                      changeSession(
+                        "full_day",
+                      );
+                    } else {
+                      changeSession(
+                        "morning",
+                      );
+                    }
+                  }}
+                >
+                  <option value="full_day">
+                    Full Day
+                  </option>
+
+                  <option value="half_day">
+                    Half Day
+                  </option>
+                </select>
+              </Field>
+
+              {isHalfDay && (
+                <Field
+                  label="Half Day session"
+                  htmlFor="halfDaySession"
+                >
+                  <select
+                    id="halfDaySession"
+                    className="input"
+                    value={
+                      leaveSession
+                    }
+                    onChange={(e) =>
+                      changeSession(
+                        e.target
+                          .value as LeaveSession,
+                      )
+                    }
+                  >
+                    <option value="morning">
+                      Morning
+                    </option>
+
+                    <option value="afternoon">
+                      Afternoon
+                    </option>
+                  </select>
+                </Field>
+              )}
+
+              <Field
                 label={
-                  leaveType === "comp_day"
+                  isSingleDay
                     ? "Leave date"
                     : "Start date"
                 }
                 htmlFor="startDate"
-                error={err("startDate")}
+                error={err(
+                  "startDate",
+                )}
               >
                 <input
                   id="startDate"
@@ -176,30 +343,44 @@ export function RequestForm({
                   type="date"
                   className="input"
                   required
-                  min={earliestStartDate}
+                  min={
+                    earliestStartDate
+                  }
                   value={startDate}
                   onChange={(e) => {
-                    const value = e.target.value;
+                    const value =
+                      e.target.value;
 
-                    setStartDate(value);
+                    setStartDate(
+                      value,
+                    );
 
-                    if (leaveType === "comp_day") {
-                      setEndDate(value);
+                    if (
+                      isSingleDay
+                    ) {
+                      setEndDate(
+                        value,
+                      );
                     } else if (
                       endDate &&
-                      value > endDate
+                      value >
+                        endDate
                     ) {
-                      setEndDate(value);
+                      setEndDate(
+                        value,
+                      );
                     }
                   }}
                 />
               </Field>
 
-              {leaveType === "annual" ? (
+              {!isSingleDay ? (
                 <Field
                   label="End date"
                   htmlFor="endDate"
-                  error={err("endDate")}
+                  error={err(
+                    "endDate",
+                  )}
                 >
                   <input
                     id="endDate"
@@ -213,7 +394,10 @@ export function RequestForm({
                     }
                     value={endDate}
                     onChange={(e) =>
-                      setEndDate(e.target.value)
+                      setEndDate(
+                        e.target
+                          .value,
+                      )
                     }
                   />
                 </Field>
@@ -221,15 +405,29 @@ export function RequestForm({
                 <input
                   type="hidden"
                   name="endDate"
-                  value={startDate}
+                  value={
+                    startDate
+                  }
                 />
               )}
             </div>
 
-            {leaveType === "comp_day" && (
+            {leaveType ===
+              "comp_day" && (
               <p className="tiny">
-                Compensatory Leave is for one full day only
-                and can only be used on an eligible WFH day.
+                Compensatory Leave can
+                be used as a Full Day
+                or Half Day and can
+                only be used on an
+                eligible WFH day.
+              </p>
+            )}
+
+            {isHalfDay && (
+              <p className="tiny">
+                Half Day leave deducts
+                0.5 day from the
+                selected leave balance.
               </p>
             )}
 
@@ -245,7 +443,8 @@ export function RequestForm({
                 className="textarea"
                 maxLength={1000}
                 placeholder={
-                  leaveType === "comp_day"
+                  leaveType ===
+                  "comp_day"
                     ? "e.g. Using Comp Day earned from weekend work"
                     : "e.g. Family trip to Chiang Mai"
                 }
@@ -254,21 +453,39 @@ export function RequestForm({
 
             {calcError && (
               <Alert kind="warn">
-                <IconAlert size={16} />
-                <span>{calcError}</span>
+                <IconAlert
+                  size={16}
+                />
+                <span>
+                  {calcError}
+                </span>
               </Alert>
             )}
 
             {overBudget && (
               <Alert kind="error">
-                <IconAlert size={16} />
+                <IconAlert
+                  size={16}
+                />
 
                 <span>
                   This request needs{" "}
-                  <b>{calc!.leaveDays} day(s)</b> but you
-                  only have{" "}
-                  <b>{availableBalance}</b> available once
-                  pending requests are counted.
+                  <b>
+                    {
+                      calc!
+                        .leaveDays
+                    }{" "}
+                    day(s)
+                  </b>{" "}
+                  but you only have{" "}
+                  <b>
+                    {
+                      availableBalance
+                    }
+                  </b>{" "}
+                  available once
+                  pending requests
+                  are counted.
                 </span>
               </Alert>
             )}
@@ -279,12 +496,16 @@ export function RequestForm({
               {calcPending
                 ? "Calculating…"
                 : calc
-                  ? leaveType === "comp_day"
-                    ? "1 Comp Day will be used"
+                  ? leaveType ===
+                    "comp_day"
+                    ? `${calc.leaveDays} Comp Day${calc.leaveDays === 1 ? "" : "s"} will be used`
                     : `${calc.leaveDays} day(s) will be deducted`
-                  : leaveType === "comp_day"
+                  : leaveType ===
+                      "comp_day"
                     ? "Pick a WFH date to continue"
-                    : "Pick your dates to see the calculation"}
+                    : isHalfDay
+                      ? "Pick a date to continue"
+                      : "Pick your dates to see the calculation"}
             </span>
 
             <button
@@ -293,7 +514,8 @@ export function RequestForm({
               disabled={
                 pending ||
                 !calc ||
-                calc.leaveDays === 0 ||
+                calc.leaveDays ===
+                  0 ||
                 overBudget
               }
             >
@@ -309,24 +531,32 @@ export function RequestForm({
         <Card>
           <CardHead
             title={
-              leaveType === "comp_day"
+              leaveType ===
+              "comp_day"
                 ? "Comp Day rules"
                 : "How this is calculated"
             }
           />
 
           <div className="card-body">
-            {leaveType === "comp_day" ? (
+            {leaveType ===
+            "comp_day" ? (
               <div className="stack">
                 <p className="muted-sm">
-                  Compensatory Leave can only be used on
-                  an eligible <b>WFH day</b>.
+                  Compensatory Leave
+                  can only be used on
+                  an eligible{" "}
+                  <b>WFH day</b>.
                 </p>
 
                 <p className="tiny">
-                  Each request uses exactly 1 Comp Day.
-                  Office days, weekends, and company
-                  holidays cannot be selected.
+                  A Full Day uses 1
+                  Comp Day. A Half Day
+                  uses 0.5 Comp Day.
+                  Office days,
+                  weekends, and
+                  company holidays
+                  cannot be selected.
                 </p>
 
                 {calc && (
@@ -337,7 +567,25 @@ export function RequestForm({
                       </span>
 
                       <span className="val">
-                        {formatDate(calc.startDate)}
+                        {formatDate(
+                          calc.startDate,
+                        )}
+                      </span>
+                    </div>
+
+                    <div className="breakdown-row">
+                      <span className="lbl">
+                        Duration
+                      </span>
+
+                      <span className="val">
+                        {leaveSession ===
+                        "morning"
+                          ? "Half Day — Morning"
+                          : leaveSession ===
+                              "afternoon"
+                            ? "Half Day — Afternoon"
+                            : "Full Day"}
                       </span>
                     </div>
 
@@ -347,20 +595,68 @@ export function RequestForm({
                       </span>
 
                       <span className="val">
-                        1
+                        {
+                          calc.leaveDays
+                        }
                       </span>
                     </div>
                   </div>
                 )}
               </div>
+            ) : calc &&
+              isHalfDay ? (
+              <div className="breakdown">
+                <div className="breakdown-row">
+                  <span className="lbl">
+                    Selected date
+                  </span>
+
+                  <span className="val">
+                    {formatDate(
+                      calc.startDate,
+                    )}
+                  </span>
+                </div>
+
+                <div className="breakdown-row">
+                  <span className="lbl">
+                    Session
+                  </span>
+
+                  <span className="val">
+                    {leaveSession ===
+                    "morning"
+                      ? "Morning"
+                      : "Afternoon"}
+                  </span>
+                </div>
+
+                <div className="breakdown-row total">
+                  <span className="lbl">
+                    Leave days deducted
+                  </span>
+
+                  <span className="val">
+                    {calc.leaveDays}
+                  </span>
+                </div>
+              </div>
             ) : calc ? (
-              <Breakdown calc={calc} />
+              <Breakdown
+                calc={calc}
+              />
             ) : (
               <p className="muted-sm">
-                ISX office days are currently{" "}
-                <b>{officeDayNames}</b>. Choose a date
-                range and you&apos;ll see exactly which
-                days count against your balance and which
+                ISX office days are
+                currently{" "}
+                <b>
+                  {officeDayNames}
+                </b>
+                . Choose a date range
+                and you&apos;ll see
+                exactly which days
+                count against your
+                balance and which
                 don&apos;t.
               </p>
             )}
@@ -370,93 +666,152 @@ export function RequestForm({
         <Card>
           <CardHead
             title={
-              leaveType === "comp_day"
+              leaveType ===
+              "comp_day"
                 ? "Your Comp Day balance"
                 : "Your annual leave balance"
             }
           />
 
           <div className="card-body">
-            {leaveType === "comp_day" ? (
+            {leaveType ===
+            "comp_day" ? (
               <>
                 <dl className="dl">
-                  <dt>Earned this year</dt>
+                  <dt>
+                    Earned this year
+                  </dt>
                   <dd className="num">
-                    {compDayBalance.earned} days
+                    {
+                      compDayBalance.earned
+                    }{" "}
+                    days
                   </dd>
 
-                  <dt>Used / approved</dt>
+                  <dt>
+                    Used / approved
+                  </dt>
                   <dd className="num">
-                    {compDayBalance.approved} days
+                    {
+                      compDayBalance.approved
+                    }{" "}
+                    days
                   </dd>
 
-                  <dt>Awaiting approval</dt>
+                  <dt>
+                    Awaiting approval
+                  </dt>
                   <dd className="num">
-                    {compDayBalance.pending} days
+                    {
+                      compDayBalance.pending
+                    }{" "}
+                    days
                   </dd>
 
-                  <dt>Remaining</dt>
+                  <dt>
+                    Remaining
+                  </dt>
                   <dd className="num">
-                    {compDayBalance.remaining} days
+                    {
+                      compDayBalance.remaining
+                    }{" "}
+                    days
                   </dd>
 
-                  <dt>Available to book</dt>
+                  <dt>
+                    Available to book
+                  </dt>
                   <dd
                     className="num"
                     style={{
                       color:
-                        compDayBalance.available <= 1
+                        compDayBalance.available <=
+                        1
                           ? "var(--c-warn)"
                           : undefined,
                     }}
                   >
-                    {compDayBalance.available} days
+                    {
+                      compDayBalance.available
+                    }{" "}
+                    days
                   </dd>
                 </dl>
 
                 <p className="tiny mt-16">
-                  Comp Days are earned by working on an
-                  eligible weekend or company holiday.
-                  They expire at the end of the year they
-                  were earned.
+                  Comp Days are earned
+                  by working on an
+                  eligible weekend or
+                  company holiday.
+                  They can be used in
+                  Full Day or Half Day
+                  increments and expire
+                  at the end of the
+                  year they were
+                  earned.
                 </p>
               </>
             ) : (
               <>
                 <dl className="dl">
-                  <dt>Annual entitlement</dt>
+                  <dt>
+                    Annual entitlement
+                  </dt>
                   <dd className="num">
-                    {balance.entitlement} days
+                    {
+                      balance.entitlement
+                    }{" "}
+                    days
                   </dd>
 
-                  <dt>Approved so far</dt>
+                  <dt>
+                    Approved so far
+                  </dt>
                   <dd className="num">
-                    {balance.approved} days
+                    {
+                      balance.approved
+                    }{" "}
+                    days
                   </dd>
 
-                  <dt>Awaiting approval</dt>
+                  <dt>
+                    Awaiting approval
+                  </dt>
                   <dd className="num">
-                    {balance.pending} days
+                    {
+                      balance.pending
+                    }{" "}
+                    days
                   </dd>
 
-                  <dt>Available to book</dt>
+                  <dt>
+                    Available to book
+                  </dt>
                   <dd
                     className="num"
                     style={{
                       color:
-                        balance.available <= 2
+                        balance.available <=
+                        2
                           ? "var(--c-warn)"
                           : undefined,
                     }}
                   >
-                    {balance.available} days
+                    {
+                      balance.available
+                    }{" "}
+                    days
                   </dd>
                 </dl>
 
                 <p className="tiny mt-16">
-                  Only approved Annual Leave reduces your
-                  official annual balance. Pending requests
-                  are held aside so you can&apos;t book the
+                  Only approved Annual
+                  Leave reduces your
+                  official annual
+                  balance. Pending
+                  requests are held
+                  aside so you
+                  can&apos;t book the
                   same balance twice.
                 </p>
               </>
@@ -482,28 +837,38 @@ export function Breakdown({
           </span>
 
           <span className="val">
-            {calc.totalCalendarDays}
+            {
+              calc.totalCalendarDays
+            }
           </span>
         </div>
 
         <div className="breakdown-row">
           <span className="lbl">
-            Non-office days (weekends and days ISX
-            doesn&apos;t work)
+            Non-office days (weekends
+            and days ISX doesn&apos;t
+            work)
           </span>
 
           <span className="val">
-            − {calc.excludedNonOfficeDays}
+            −{" "}
+            {
+              calc.excludedNonOfficeDays
+            }
           </span>
         </div>
 
         <div className="breakdown-row">
           <span className="lbl">
-            Public holidays falling on an office day
+            Public holidays falling
+            on an office day
           </span>
 
           <span className="val">
-            − {calc.excludedHolidays}
+            −{" "}
+            {
+              calc.excludedHolidays
+            }
           </span>
         </div>
 
@@ -518,7 +883,8 @@ export function Breakdown({
         </div>
       </div>
 
-      {calc.holidays.length > 0 && (
+      {calc.holidays.length >
+        0 && (
         <div className="mt-16">
           <div
             className="tiny"
@@ -534,24 +900,39 @@ export function Breakdown({
             className="stack"
             style={{ gap: 6 }}
           >
-            {calc.holidays.map((h) => (
-              <div
-                key={h.date + h.name}
-                className="row"
-                style={{ gap: 8 }}
-              >
-                <IconCheck size={14} />
+            {calc.holidays.map(
+              (h) => (
+                <div
+                  key={
+                    h.date +
+                    h.name
+                  }
+                  className="row"
+                  style={{
+                    gap: 8,
+                  }}
+                >
+                  <IconCheck
+                    size={14}
+                  />
 
-                <span className="tiny">
-                  <b>{formatDate(h.date)}</b>
-                  {" — "}
-                  {h.name}{" "}
-                  <span className="chip">
-                    {h.source}
+                  <span className="tiny">
+                    <b>
+                      {formatDate(
+                        h.date,
+                      )}
+                    </b>
+                    {" — "}
+                    {h.name}{" "}
+                    <span className="chip">
+                      {
+                        h.source
+                      }
+                    </span>
                   </span>
-                </span>
-              </div>
-            ))}
+                </div>
+              ),
+            )}
           </div>
         </div>
       )}

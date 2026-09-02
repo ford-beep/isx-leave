@@ -48,10 +48,8 @@ export async function updateProfileAction(
   try {
     await withUser(me.id, (db) =>
       db.query(
-        `update users
-         set name = $2
-         where id = $1`,
-        [me.id, parsed.data.name],
+        `select app.update_own_profile($1)`,
+        [parsed.data.name],
       ),
     );
   } catch (error) {
