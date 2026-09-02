@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/auth";
 import { companyToday, formatDate, WEEKDAY_NAMES } from "@/lib/date";
 import {
+  getCalendarBirthdays,
   getHolidays,
   getOfficeDays,
   getRequestsInMonth,
@@ -13,21 +14,23 @@ export const dynamic = "force-dynamic";
 
 export default async function CalendarPage({
   searchParams,
-}: { searchParams: Promise<{ y?: string; m?: string }> }) {
+}: {
+  searchParams: Promise<{ y?: string; m?: string }>;
+}) {
   const me = await requireUser();
   const today = companyToday();
   const sp = await searchParams;
   const year = Number(sp.y) || Number(today.slice(0, 4));
   const month = Number(sp.m) || Number(today.slice(5, 7));
 
-  const [office, holidays, requests, workSchedule] = await Promise.all([
-    getOfficeDays(me.id),
-    getHolidays(me.id, year),
-    // Personal calendar: always show only the signed-in user's own leave.
-    // Admins can see company-wide leave separately in /admin/calendar.
-    getRequestsInMonth(me.id, year, month, me.id),
-    getWorkSchedule(me.id, year, month),
-  ]);
+  const [office, holidays, requests, workSchedule, birthdays] =
+    await Promise.all([
+      getOfficeDays(me.id),
+      getHolidays(me.id, year),
+      getRequestsInMonth(me.id, year, month, me.id),
+      getWorkSchedule(me.id, year, month),
+      getCalendarBirthdays(me.id),
+    ]);
 
   const monthHolidays = holidays.filter(
     (h) => h.active && Number(h.date.slice(5, 7)) === month,
@@ -39,7 +42,8 @@ export default async function CalendarPage({
         <div className="grow">
           <h1>Calendar</h1>
           <p className="muted">
-            Office days are <b>{office.weekdays.map((d) => WEEKDAY_NAMES[d]).join(" + ")}</b>.
+            Office days are{" "}
+            <b>{office.weekdays.map((d) => WEEKDAY_NAMES[d]).join(" + ")}</b>.
             Public holidays come from the Bank of Thailand calendar.
           </p>
         </div>
@@ -49,10 +53,12 @@ export default async function CalendarPage({
         <Card>
           <div className="card-body">
             <MonthCalendar
-              year={year} month={month}
+              year={year}
+              month={month}
               officeWeekdays={office.weekdays}
               holidays={holidays}
               requests={requests}
+              birthdays={birthdays}
               mode="employee"
               basePath="/calendar"
               workSchedule={workSchedule}
@@ -71,13 +77,21 @@ export default async function CalendarPage({
                   {monthHolidays.map((h) => (
                     <div key={h.id}>
                       <div className="row" style={{ gap: 8 }}>
-                        <span style={{ fontSize: 13, fontWeight: 650 }}>{formatDate(h.date)}</span>
-                        <span className={`badge plain ${h.type === "public" ? "badge-info" : "badge-brand"}`}>
+                        <span style={{ fontSize: 13, fontWeight: 650 }}>
+                          {formatDate(h.date)}
+                        </span>
+                        <span
+                          className={`badge plain ${h.type === "public" ? "badge-info" : "badge-brand"}`}
+                        >
                           {h.type === "public" ? h.source : "Company"}
                         </span>
                       </div>
                       <div className="tiny">{h.name}</div>
-                      {h.nameTh && <div className="tiny" style={{ opacity: .8 }}>{h.nameTh}</div>}
+                      {h.nameTh && (
+                        <div className="tiny" style={{ opacity: 0.8 }}>
+                          {h.nameTh}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -89,8 +103,9 @@ export default async function CalendarPage({
             <CardHead title="Your leave, privately" />
             <div className="card-body">
               <p className="muted-sm">
-                This calendar shows only your own leave. Other people&apos;s time off isn&apos;t visible to
-                you — the database refuses to return it, not just the screen.
+                This calendar shows only your own leave. Other people&apos;s
+                time off isn&apos;t visible to you — the database refuses to
+                return it, not just the screen.
               </p>
             </div>
           </Card>
