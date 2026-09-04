@@ -35,11 +35,13 @@ export function LeaveTable({
   emptyAction,
   allowSelfCancel = false,
   today,
+  highlightRequestId,
 }: {
   requests: LeaveRequest[];
   emptyAction?: ReactNode;
   allowSelfCancel?: boolean;
   today?: string;
+  highlightRequestId?: string;
 }) {
   if (requests.length === 0) {
     return (
@@ -81,7 +83,21 @@ export function LeaveTable({
               today! < r.startDate;
 
             return (
-              <tr key={r.id}>
+<tr
+  key={r.id}
+  id={`request-${r.id}`}
+  style={
+    r.id === highlightRequestId
+      ? {
+          background:
+            "var(--surface-accent, rgba(99, 102, 241, 0.08))",
+          outline:
+            "2px solid var(--c-accent)",
+          outlineOffset: "-2px",
+        }
+      : undefined
+  }
+>
                 <td
                   data-label="Date"
                   className="primary nowrap"

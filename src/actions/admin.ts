@@ -13,6 +13,7 @@ import {
   getActiveAdminEmails,
   getActiveCompanyEmails,
   getRequestById,
+  getUser,
 } from "@/lib/queries";
 import { env } from "@/lib/env";
 import { revalidatePath } from "next/cache";
@@ -65,10 +66,13 @@ export async function approveLeaveAction(
   try {
     const request = await getRequestById(me.id, id);
 
-    if (
-      request?.employeeEmail &&
-      !request.employeeEmail.endsWith("@demo.isx.local")
-    ) {
+    const requestUrl =
+  `${env.appUrl}/my-leave?request=${id}#request-${id}`;
+
+if (
+  request?.employeeEmail &&
+  !request.employeeEmail.endsWith("@demo.isx.local")
+) {
       await sendEmail({
         to: request.employeeEmail,
         subject: "Your leave request was approved",
@@ -83,7 +87,11 @@ export async function approveLeaveAction(
             <strong>Days:</strong> ${request.leaveDays}
           </p>
 
-          <p>You can view the request in ISX Leave.</p>
+          <p>
+  <a href="${requestUrl}">
+    View Leave Request
+  </a>
+</p>
         `,
       });
     }
@@ -146,11 +154,13 @@ export async function rejectLeaveAction(
   // rejecting the leave must still succeed if email delivery fails.
   try {
     const request = await getRequestById(me.id, parsed.data.id);
+const requestUrl =
+  `${env.appUrl}/my-leave?request=${parsed.data.id}#request-${parsed.data.id}`;
 
-    if (
-      request?.employeeEmail &&
-      !request.employeeEmail.endsWith("@demo.isx.local")
-    ) {
+if (
+  request?.employeeEmail &&
+  !request.employeeEmail.endsWith("@demo.isx.local")
+) {
       await sendEmail({
         to: request.employeeEmail,
         subject: "Your leave request was rejected",
@@ -168,7 +178,11 @@ export async function rejectLeaveAction(
             <strong>Reason:</strong> ${parsed.data.reason}
           </p>
 
-          <p>You can view the request in ISX Leave.</p>
+          <p>
+  <a href="${requestUrl}">
+    View Leave Request
+  </a>
+</p>
         `,
       });
     }
@@ -223,11 +237,13 @@ export async function adminCancelLeaveAction(
   // Email notification is best-effort.
   try {
     const request = await getRequestById(me.id, id);
+    const requestUrl =
+  `${env.appUrl}/my-leave?request=${id}#request-${id}`;
 
-    if (
-      request?.employeeEmail &&
-      !request.employeeEmail.endsWith("@demo.isx.local")
-    ) {
+if (
+  request?.employeeEmail &&
+  !request.employeeEmail.endsWith("@demo.isx.local")
+) {
       await sendEmail({
         to: request.employeeEmail,
         subject: "Your approved leave was cancelled",
@@ -246,7 +262,11 @@ export async function adminCancelLeaveAction(
 
           <p>The cancelled leave is no longer counted as approved leave.</p>
 
-          <p>You can view the request in ISX Leave.</p>
+          <p>
+  <a href="${requestUrl}">
+    View Leave Request
+  </a>
+</p>
         `,
       });
     }
@@ -318,35 +338,79 @@ export async function createEmergencyLeaveAction(
 
   const d = parsed.data;
 
-  try {
-    await withUser(me.id, (db) =>
-      db.query(
-        `insert into leave_requests (
-           employee_id,
-           leave_type,
-           start_date,
-           end_date,
-           reason,
-           status
-         )
-         values (
-           $1,
-           'annual',
-           $2::date,
-           $3::date,
-           $4,
-           'pending'
-         )`,
-        [
-          d.employeeId,
-          d.startDate,
-          d.endDate,
-          d.reason,
-        ],
-      ),
+let requestId: string;
+
+try {
+  requestId = await withUser(me.id, async (db) => {
+    const result = await db.query<{ id: string }>(
+      `insert into leave_requests (
+         employee_id,
+         leave_type,
+         start_date,
+         end_date,
+         reason,
+         status
+       )
+       values (
+         $1,
+         'annual',
+         $2::date,
+         $3::date,
+         $4,
+         'pending'
+       )
+       returning id`,
+      [
+        d.employeeId,
+        d.startDate,
+        d.endDate,
+        d.reason,
+      ],
     );
-  } catch (e) {
-    return fail(e);
+
+    return result.rows[0].id;
+  });
+} catch (e) {
+  return fail(e);
+}
+
+  // Email notification is best-effort.
+  try {
+    const employee = await getUser(me.id, d.employeeId);
+    const requestUrl =
+  `${env.appUrl}/my-leave?request=${requestId}#request-${requestId}`;
+    if (employee?.email) {
+      await sendEmail({
+        to: employee.email,
+        subject: "Emergency leave added for you",
+        html: `
+          <h2>Emergency leave added</h2>
+
+          <p>Hi ${employee.name},</p>
+
+          <p>
+            <strong>${me.name}</strong> added an emergency annual leave
+            request for you.
+          </p>
+
+          <p>
+            <strong>Start:</strong> ${d.startDate}<br />
+            <strong>End:</strong> ${d.endDate}<br />
+            <strong>Reason:</strong> ${d.reason}<br />
+            <strong>Status:</strong> Pending approval
+          </p>
+
+          <p>
+            <a href="${requestUrl}">View Leave Request</a>
+          </p>
+        `,
+      });
+    }
+  } catch (emailError) {
+    console.error(
+      "[email] Failed to send emergency leave notification:",
+      emailError,
+    );
   }
 
   revalidateAdmin();
@@ -444,27 +508,77 @@ export async function createSickLeaveAction(
     };
   }
 
-  try {
-    await withUser(me.id, (db) =>
-      db.query(
-        `select app.create_sick_leave(
-           $1::uuid,
-           $2::date,
-           $3::date,
-           $4::public.leave_session,
-           $5::text
-         )`,
-        [
-          d.employeeId,
-          d.startDate,
-          d.endDate,
-          d.leaveSession,
-          d.reason,
-        ],
-      ),
+let requestId: string;
+
+try {
+  requestId = await withUser(me.id, async (db) => {
+    const result = await db.query<{ id: string }>(
+      `select app.create_sick_leave(
+         $1::uuid,
+         $2::date,
+         $3::date,
+         $4::public.leave_session,
+         $5::text
+       ) as id`,
+      [
+        d.employeeId,
+        d.startDate,
+        d.endDate,
+        d.leaveSession,
+        d.reason,
+      ],
     );
-  } catch (e) {
-    return fail(e);
+
+    return result.rows[0].id;
+  });
+} catch (e) {
+  return fail(e);
+}
+
+  // Email notification is best-effort.
+  try {
+    const employee = await getUser(me.id, d.employeeId);
+    const requestUrl =
+  `${env.appUrl}/my-leave?request=${requestId}#request-${requestId}`;
+    if (employee?.email) {
+      const sessionLabel =
+        d.leaveSession === "morning"
+          ? "Morning"
+          : d.leaveSession === "afternoon"
+            ? "Afternoon"
+            : "Full day";
+
+      await sendEmail({
+        to: employee.email,
+        subject: "Sick leave recorded for you",
+        html: `
+          <h2>Sick leave recorded</h2>
+
+          <p>Hi ${employee.name},</p>
+
+          <p>
+            <strong>${me.name}</strong> recorded sick leave for you.
+          </p>
+
+          <p>
+            <strong>Start:</strong> ${d.startDate}<br />
+            <strong>End:</strong> ${d.endDate}<br />
+            <strong>Duration:</strong> ${sessionLabel}<br />
+            <strong>Note:</strong> ${d.reason}<br />
+            <strong>Status:</strong> Approved
+          </p>
+
+          <p>
+            <a href="${requestUrl}">View Leave Request</a>
+          </p>
+        `,
+      });
+    }
+  } catch (emailError) {
+    console.error(
+      "[email] Failed to send sick leave notification:",
+      emailError,
+    );
   }
 
   revalidateAdmin();
@@ -633,6 +747,43 @@ export async function setEntitlementAction(_prev: AdminFormState, formData: Form
        do update set total_days = excluded.total_days, note = excluded.note`,
       [d.employeeId, d.year, d.totalDays, d.note ?? null]));
   } catch (e) { return fail(e); }
+
+  // Email notification is best-effort.
+  try {
+    const employee = await getUser(me.id, d.employeeId);
+
+    if (employee?.email) {
+      await sendEmail({
+        to: employee.email,
+        subject: `Annual leave entitlement updated — ${d.year}`,
+        html: `
+          <h2>Annual leave entitlement updated</h2>
+
+          <p>Hi ${employee.name},</p>
+
+          <p>
+            <strong>${me.name}</strong> updated your annual leave entitlement.
+          </p>
+
+          <p>
+            <strong>Year:</strong> ${d.year}<br />
+            <strong>Entitlement:</strong> ${d.totalDays} days
+            ${d.note ? `<br /><strong>Note:</strong> ${d.note}` : ""}
+          </p>
+
+          <p>
+            <a href="${env.appUrl}/my-leave">View My Leave</a>
+          </p>
+        `,
+      });
+    }
+  } catch (emailError) {
+    console.error(
+      "[email] Failed to send entitlement notification:",
+      emailError,
+    );
+  }
+
   revalidateAdmin();
   revalidatePath(`/admin/employees/${d.employeeId}`);
   return ok(`Entitlement for ${d.year} set to ${d.totalDays} days.`);
@@ -1427,11 +1578,6 @@ if (data.length === 0) {
     );
   }
 
-  revalidateAdmin();
-  revalidatePath("/calendar");
-  revalidatePath("/dashboard");
-
-  return ok(`Synced ${data.length} BOT holidays for ${year}.`);
   revalidateAdmin();
   revalidatePath("/calendar");
   revalidatePath("/dashboard");

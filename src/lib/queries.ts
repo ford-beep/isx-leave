@@ -352,7 +352,18 @@ export async function getRequestsInMonth(
   return rows.map(mapRequest);
 }
 
-export async function getActiveAdminEmails(me: string): Promise<string[]> {
+export async function getActiveAdminEmails(
+  me: string,
+): Promise<string[]> {
+  const testRecipient =
+    process.env.NODE_ENV !== "production"
+      ? process.env.EMAIL_TEST_RECIPIENT?.trim()
+      : undefined;
+
+  if (testRecipient) {
+    return [testRecipient];
+  }
+
   const rows = await queryAs<{ email: string }>(
     me,
     `select email from app.active_admin_emails()`,
@@ -360,7 +371,9 @@ export async function getActiveAdminEmails(me: string): Promise<string[]> {
 
   return rows
     .map((row) => row.email)
-    .filter((email) => !email.endsWith("@demo.isx.local"));
+    .filter(
+      (email) => !email.endsWith("@demo.isx.local"),
+    );
 }
 
 export async function getActiveCompanyEmails(

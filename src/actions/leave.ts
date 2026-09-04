@@ -177,38 +177,43 @@ export async function submitLeaveAction(
     };
   }
 
-  try {
-    await withUser(me.id, (db) =>
-      db.query(
-        `
-          insert into leave_requests (
-            employee_id,
-            leave_type,
-            start_date,
-            end_date,
-            leave_session,
-            reason
-          )
-          values (
-            $1,
-            $2,
-            $3::date,
-            $4::date,
-            $5::public.leave_session,
-            $6
-          )
-        `,
-        [
-          me.id,
-          leaveType,
-          startDate,
-          endDate,
-          leaveSession,
-          reason ?? null,
-        ],
-      ),
+let requestId: string;
+
+try {
+  requestId = await withUser(me.id, async (db) => {
+    const result = await db.query<{ id: string }>(
+      `
+        insert into leave_requests (
+          employee_id,
+          leave_type,
+          start_date,
+          end_date,
+          leave_session,
+          reason
+        )
+        values (
+          $1,
+          $2,
+          $3::date,
+          $4::date,
+          $5::public.leave_session,
+          $6
+        )
+        returning id
+      `,
+      [
+        me.id,
+        leaveType,
+        startDate,
+        endDate,
+        leaveSession,
+        reason ?? null,
+      ],
     );
-  } catch (e) {
+
+    return result.rows[0].id;
+  });
+} catch (e) {
     const f = toFriendlyError(e);
 
     return {
@@ -260,6 +265,11 @@ export async function submitLeaveAction(
             Please sign in to ISX Leave to review
             the request.
           </p>
+          <p>
+  <a href="${env.appUrl}/admin/requests?request=${requestId}">
+    Review Request
+  </a>
+</p>
         `,
       });
     }

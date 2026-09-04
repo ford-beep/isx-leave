@@ -46,7 +46,10 @@ export function EmergencyLeaveForm({
           </option>
 
           {employees.map((employee) => (
-            <option key={employee.id} value={employee.id}>
+            <option
+              key={employee.id}
+              value={employee.id}
+            >
               {employee.name}
             </option>
           ))}
@@ -101,19 +104,28 @@ export function EmergencyLeaveForm({
 
       {state?.message && (
         <div
-          className={state.ok ? "alert alert-success" : "alert alert-error"}
+          className={
+            state.ok
+              ? "alert alert-ok"
+              : "alert alert-error"
+          }
         >
           {state.message}
         </div>
       )}
 
-      <div className="row" style={{ justifyContent: "flex-end" }}>
+      <div
+        className="row"
+        style={{ justifyContent: "flex-end" }}
+      >
         <button
           type="submit"
           className="btn btn-primary"
           disabled={pending}
         >
-          {pending ? "Adding..." : "Add emergency leave"}
+          {pending
+            ? "Adding..."
+            : "Add emergency leave"}
         </button>
       </div>
     </form>

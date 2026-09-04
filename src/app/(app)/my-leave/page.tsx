@@ -22,8 +22,16 @@ function formatDate(date: string) {
   }).format(new Date(`${date}T00:00:00Z`));
 }
 
-export default async function MyLeavePage() {
+export default async function MyLeavePage({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    request?: string;
+  }>;
+}) {
  const me = await requireUser();
+ const sp = await searchParams;
+const highlightRequestId = sp.request;
 const today = companyToday();
 const year = Number(today.slice(0, 4));
 
@@ -203,10 +211,11 @@ const year = Number(today.slice(0, 4));
           />
 
           <div className="card-body flush">
-            <LeaveTable
+<LeaveTable
   requests={requests}
   allowSelfCancel
   today={today}
+  highlightRequestId={highlightRequestId}
   emptyAction={
     <Link
       href="/request"
