@@ -37,10 +37,15 @@ export default async function EmployeesPage() {
               <table className="tbl">
                 <thead>
                   <tr>
-                    <th>Name</th><th>Role</th><th className="r">Entitlement</th>
-                    <th className="r">Used</th><th className="r">Remaining</th>
-                    <th>Status</th><th className="r">Action</th>
-                  </tr>
+  <th>Name</th>
+  <th>Role</th>
+  <th className="r">Entitlement</th>
+  <th className="r">Used</th>
+  <th className="r">Remaining</th>
+  <th className="r">Sick leave</th>
+  <th>Status</th>
+  <th className="r">Action</th>
+</tr>
                 </thead>
                 <tbody>
                   {employees.map((e) => (
@@ -51,10 +56,11 @@ export default async function EmployeesPage() {
                           {e.role === "admin" ? "Admin" : "Employee"}
                         </span>
                       </td>
-                      <td data-label="Entitlement" className="r num">{e.entitlement}</td>
-                      <td data-label="Used" className="r num">{e.used}</td>
-                      <td data-label="Remaining" className="r num primary">{e.remaining}</td>
-                      <td data-label="Status">
+                     <td data-label="Entitlement" className="r num">{e.entitlement}</td>
+<td data-label="Used" className="r num">{e.used}</td>
+<td data-label="Remaining" className="r num primary">{e.remaining}</td>
+<td data-label="Sick leave" className="r num">{e.sickLeaveUsed}</td>
+<td data-label="Status">
                         <span className={`badge ${e.active ? "badge-approved" : "badge-cancelled"}`}>
                           {e.active ? "Active" : "Inactive"}
                         </span>

@@ -1,5 +1,5 @@
 "use server";
-
+import { env } from "@/lib/env";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth";
@@ -486,4 +486,171 @@ export async function markNotificationsReadAction(): Promise<void> {
   );
 
   revalidatePath("/dashboard");
+}
+
+export async function cancelOwnLeaveAction(
+  requestId: string,
+): Promise<LeaveFormState> {
+  const me = await requireUser();
+
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      requestId,
+    )
+  ) {
+    return {
+      ok: false,
+      message: "Invalid leave request.",
+    };
+  }
+
+  let cancelled: {
+    previous_status: string;
+    leave_type: string;
+    start_date: string;
+    end_date: string;
+    leave_days: string | number;
+  };
+
+  try {
+    cancelled = await withUser(
+      me.id,
+      async (db) => {
+        const result = await db.query<{
+          previous_status: string;
+          leave_type: string;
+          start_date: string;
+          end_date: string;
+          leave_days: string | number;
+        }>(
+          `
+            select
+              previous_status,
+              leave_type,
+              start_date::text,
+              end_date::text,
+              leave_days
+            from app.cancel_own_leave($1::uuid)
+          `,
+          [requestId],
+        );
+
+        if (!result.rows[0]) {
+          throw new Error("LEAVE_NOT_FOUND");
+        }
+
+        return result.rows[0];
+      },
+    );
+  } catch (e) {
+    const message =
+      e instanceof Error &&
+      e.message.includes(
+        "LEAVE_SELF_CANCEL_TOO_LATE",
+      )
+        ? "This leave can no longer be cancelled because the leave date has started."
+        : e instanceof Error &&
+            e.message.includes(
+              "LEAVE_SELF_CANCEL_NOT_ALLOWED",
+            )
+          ? "This type of leave cannot be cancelled by employees."
+          : e instanceof Error &&
+              e.message.includes(
+                "LEAVE_INVALID_TRANSITION",
+              )
+            ? "This leave can no longer be cancelled."
+            : toFriendlyError(e).message;
+
+    return {
+      ok: false,
+      message,
+    };
+  }
+
+  try {
+    const adminEmails =
+      await getActiveAdminEmails(me.id);
+
+    if (adminEmails.length > 0) {
+      const leaveTypeLabel =
+        cancelled.leave_type === "comp_day"
+          ? "Compensatory Leave"
+          : "Annual Leave";
+        const requestUrl =
+        `${env.appUrl}/admin/requests?request=${requestId}`;
+      await sendEmail({
+
+        to: adminEmails,
+        subject: `Leave cancelled — ${me.name}`,
+        html: `
+          <h2>Leave cancelled by employee</h2>
+
+          <p>
+            <strong>${me.name}</strong>
+            has cancelled their leave request.
+          </p>
+
+          <p>
+            <strong>Leave type:</strong>
+            ${leaveTypeLabel}<br />
+
+            <strong>Start:</strong>
+            ${cancelled.start_date}<br />
+
+            <strong>End:</strong>
+            ${cancelled.end_date}<br />
+
+            <strong>Days:</strong>
+            ${cancelled.leave_days}<br />
+
+            <strong>Previous status:</strong>
+            ${cancelled.previous_status}<br />
+
+            <strong>New status:</strong>
+            Cancelled
+          </p>
+
+          <p>
+  <a
+    href="${requestUrl}"
+    style="
+      display:inline-block;
+      padding:10px 16px;
+      background:#111827;
+      color:#ffffff;
+      text-decoration:none;
+      border-radius:8px;
+      font-weight:600;
+    "
+  >
+    View leave request
+  </a>
+</p>
+
+<p>
+  Or open this link:<br />
+  <a href="${requestUrl}">
+    ${requestUrl}
+  </a>
+</p>
+        `,
+      });
+    }
+  } catch (error) {
+    console.error(
+      "[leave cancel email] Could not notify admins:",
+      error,
+    );
+  }
+
+  revalidatePath("/my-leave");
+  revalidatePath("/dashboard");
+  revalidatePath("/calendar");
+  revalidatePath("/admin");
+  revalidatePath("/admin/requests");
+
+  return {
+    ok: true,
+    message: "Leave cancelled successfully.",
+  };
 }

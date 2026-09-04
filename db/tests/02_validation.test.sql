@@ -54,28 +54,59 @@ select pg_temp.raises(
   'leave_requests_no_overlap',
   'overlapping an APPROVED request is refused');
 
--- Jane already has leave covering 12–13 Oct.
+-- Create a dedicated pending request, then verify that another request
+-- cannot overlap it.
+insert into leave_requests (
+  employee_id,
+  leave_type,
+  start_date,
+  end_date,
+  reason
+)
+values (
+  :'jane'::uuid,
+  'annual',
+  '2026-10-19',
+  '2026-10-20',
+  'Pending overlap fixture'
+);
+
 select pg_temp.raises(
   'insert into leave_requests (employee_id, leave_type, start_date, end_date)
-   values (''22222222-2222-4222-8222-222222222222'', ''annual'', ''2026-10-13'', ''2026-10-20'')',
-  'leave_requests_no_overlap', 'overlapping a PENDING request is refused');
+   values (''22222222-2222-4222-8222-222222222222'', ''annual'', ''2026-10-20'', ''2026-10-21'')',
+  'leave_requests_no_overlap',
+  'overlapping a PENDING request is refused');
 
 -- Double submission of the identical range (rapid double-click / replayed POST)
-insert into leave_requests (employee_id, leave_type, start_date, end_date, reason)
-values (:'jane'::uuid, 'annual', '2026-11-16', '2026-11-17', 'Test A');
+insert into leave_requests (
+  employee_id,
+  leave_type,
+  start_date,
+  end_date,
+  reason
+)
+values (
+  :'jane'::uuid,
+  'annual',
+  '2026-11-16',
+  '2026-11-16',
+  'Test A'
+);
+
 select pg_temp.raises(
   'insert into leave_requests (employee_id, leave_type, start_date, end_date, reason)
-   values (''22222222-2222-4222-8222-222222222222'', ''annual'', ''2026-11-16'', ''2026-11-17'', ''Test A'')',
-  'leave_requests_no_overlap', 'duplicate submission of the same range is refused');
+   values (''22222222-2222-4222-8222-222222222222'', ''annual'', ''2026-11-16'', ''2026-11-16'', ''Test A'')',
+  'leave_requests_no_overlap',
+  'duplicate submission of the same range is refused');
 
 -- ---------------------------------------------------------------------------
 -- Balance ceiling (§10) — approved + pending may not exceed the entitlement
 -- ---------------------------------------------------------------------------
--- Jane has 2 bookable days available under the current seeded data.
+-- The dedicated overlap fixture plus Test A reserve Jane's remaining balance.
 select pg_temp.eq(
   (select available from app.leave_balance(:'jane'::uuid, 2026)),
   2::numeric,
-  'Jane has 2 bookable days left after the test request above');
+  'Jane has 2 bookable days left after the test requests above');
 
 select pg_temp.raises(
   'insert into leave_requests (employee_id, leave_type, start_date, end_date)
@@ -96,48 +127,77 @@ select pg_temp.raises(
   'LEAVE_IMMUTABLE_AFTER_SUBMIT', 'nobody can hand-edit the calculated day count');
 
 -- ---------------------------------------------------------------------------
--- State machine (§7) — leave status changes are admin-only
+-- State machine (§7) — admin decisions + employee self-cancel
 -- ---------------------------------------------------------------------------
 
+-- Employees still cannot approve their own requests.
 select pg_temp.raises(
   'update leave_requests set status = ''approved''
-   where employee_id = ''22222222-2222-4222-8222-222222222222'' and reason = ''Test A''',
+   where employee_id = ''22222222-2222-4222-8222-222222222222''
+     and reason = ''Test A''',
   'LEAVE_STATUS_CHANGE_ADMIN_ONLY',
   'an employee cannot approve their own request');
 
+-- Employees still cannot reject their own requests.
 select pg_temp.raises(
-  'update leave_requests set status = ''rejected'', rejection_reason = ''nope''
-   where employee_id = ''22222222-2222-4222-8222-222222222222'' and reason = ''Test A''',
+  'update leave_requests
+   set status = ''rejected'',
+       rejection_reason = ''nope''
+   where employee_id = ''22222222-2222-4222-8222-222222222222''
+     and reason = ''Test A''',
   'LEAVE_STATUS_CHANGE_ADMIN_ONLY',
-  'an employee cannot reject a request');
+  'an employee cannot reject their own request');
 
-select pg_temp.raises(
-  'update leave_requests set status = ''cancelled''
-   where employee_id = ''22222222-2222-4222-8222-222222222222'' and reason = ''Test A''',
-  'LEAVE_STATUS_CHANGE_ADMIN_ONLY',
-  'an employee cannot cancel their own pending request');
+-- Employees may cancel their own future pending Annual Leave.
+select pg_temp.ok(
+  app.cancel_own_leave(
+    (
+      select id
+      from leave_requests
+      where employee_id = :'jane'::uuid
+        and reason = 'Test A'
+    )
+  ) is not null,
+  'an employee can cancel their own future pending Annual Leave'
+);
 
 select pg_temp.eq(
-  (select status::text
-     from leave_requests
+  (
+    select status::text
+    from leave_requests
     where employee_id = :'jane'::uuid
-      and reason = 'Test A'),
-  'pending',
-  'the request remains pending after the employee cancellation attempt');
+      and reason = 'Test A'
+  ),
+  'cancelled',
+  'pending Annual Leave is cancelled afterwards'
+);
 
--- …but not one that has already been decided. The RLS USING clause only
--- exposes still-pending rows for UPDATE, so this silently matches nothing
--- rather than erroring — the row is simply out of reach.
-with u as (
-  update leave_requests set status = 'cancelled'
-   where employee_id = :'jane'::uuid and start_date = '2026-09-18' returning 1
-) select pg_temp.eq((select count(*) from u)::int, 0,
-  'an employee cannot cancel an already-approved request (0 rows reachable)');
+-- Employees may also cancel their own future approved Annual Leave.
+select pg_temp.ok(
+  app.cancel_own_leave(
+    (
+      select id
+      from leave_requests
+      where employee_id = :'jane'::uuid
+        and start_date = date '2026-09-18'
+        and status = 'approved'
+    )
+  ) is not null,
+  'an employee can cancel their own future approved Annual Leave'
+);
+
 select pg_temp.eq(
-  (select status::text from leave_requests where employee_id = :'jane'::uuid and start_date = '2026-09-18'),
-  'approved', 'the approved request is still approved afterwards');
+  (
+    select status::text
+    from leave_requests
+    where employee_id = :'jane'::uuid
+      and start_date = date '2026-09-18'
+  ),
+  'cancelled',
+  'approved Annual Leave is cancelled afterwards'
+);
 
--- Create a dedicated pending request for admin decision tests.
+-- Create a dedicated pending request for the admin-decision tests.
 select pg_temp.act_as(:'jane');
 
 insert into leave_requests (
@@ -154,10 +214,6 @@ values (
   '2026-12-23',
   'Admin decision test'
 );
-
-
-
-
 -- ---------------------------------------------------------------------------
 -- Admin decisions
 -- ---------------------------------------------------------------------------

@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { CancelLeaveButton } from "./CancelLeaveButton";
 import {
   formatDate,
   formatRange,
@@ -32,9 +33,13 @@ function sessionLabel(
 export function LeaveTable({
   requests,
   emptyAction,
+  allowSelfCancel = false,
+  today,
 }: {
   requests: LeaveRequest[];
   emptyAction?: ReactNode;
+  allowSelfCancel?: boolean;
+  today?: string;
 }) {
   if (requests.length === 0) {
     return (
@@ -54,87 +59,114 @@ export function LeaveTable({
           <tr>
             <th>Date</th>
             <th>Leave type</th>
-            <th className="r">
-              Days
-            </th>
+            <th className="r">Days</th>
             <th>Status</th>
             <th>Submitted</th>
+
+            {allowSelfCancel && (
+              <th>Action</th>
+            )}
           </tr>
         </thead>
 
         <tbody>
-          {requests.map((r) => (
-            <tr key={r.id}>
-              <td
-                data-label="Date"
-                className="primary nowrap"
-              >
-                {formatRange(
-                  r.startDate,
-                  r.endDate,
-                )}
+          {requests.map((r) => {
+            const canSelfCancel =
+              allowSelfCancel &&
+              Boolean(today) &&
+              (r.leaveType === "annual" ||
+                r.leaveType === "comp_day") &&
+              (r.status === "pending" ||
+                r.status === "approved") &&
+              today! < r.startDate;
 
-                {r.leaveSession !==
-                  "full_day" && (
-                  <div
-                    className="tiny"
-                    style={{
-                      marginTop: 2,
-                    }}
-                  >
-                    {sessionLabel(
-                      r.leaveSession,
-                    )}
-                  </div>
-                )}
-              </td>
+            return (
+              <tr key={r.id}>
+                <td
+                  data-label="Date"
+                  className="primary nowrap"
+                >
+                  {formatRange(
+                    r.startDate,
+                    r.endDate,
+                  )}
 
-              <td data-label="Leave type">
-                {r.leaveTypeLabel}
-
-                {r.status ===
-                  "rejected" &&
-                  r.rejectionReason && (
+                  {r.leaveSession !==
+                    "full_day" && (
                     <div
                       className="tiny"
                       style={{
                         marginTop: 2,
                       }}
                     >
-                      Reason:{" "}
-                      {
-                        r.rejectionReason
-                      }
+                      {sessionLabel(
+                        r.leaveSession,
+                      )}
                     </div>
                   )}
-              </td>
+                </td>
 
-              <td
-                data-label="Days"
-                className="r num"
-              >
-                {r.leaveDays}
-              </td>
+                <td data-label="Leave type">
+                  {r.leaveTypeLabel}
 
-              <td data-label="Status">
-                <StatusBadge
-                  status={r.status}
-                />
-              </td>
+                  {r.status ===
+                    "rejected" &&
+                    r.rejectionReason && (
+                      <div
+                        className="tiny"
+                        style={{
+                          marginTop: 2,
+                        }}
+                      >
+                        Reason:{" "}
+                        {
+                          r.rejectionReason
+                        }
+                      </div>
+                    )}
+                </td>
 
-              <td
-                data-label="Submitted"
-                className="muted-sm nowrap"
-              >
-                {formatDate(
-                  r.createdAt.slice(
-                    0,
-                    10,
-                  ),
+                <td
+                  data-label="Days"
+                  className="r num"
+                >
+                  {r.leaveDays}
+                </td>
+
+                <td data-label="Status">
+                  <StatusBadge
+                    status={r.status}
+                  />
+                </td>
+
+                <td
+                  data-label="Submitted"
+                  className="muted-sm nowrap"
+                >
+                  {formatDate(
+                    r.createdAt.slice(
+                      0,
+                      10,
+                    ),
+                  )}
+                </td>
+
+                {allowSelfCancel && (
+                  <td data-label="Action">
+                    {canSelfCancel ? (
+                      <CancelLeaveButton
+                        requestId={r.id}
+                      />
+                    ) : (
+                      <span className="muted-sm">
+                        —
+                      </span>
+                    )}
+                  </td>
                 )}
-              </td>
-            </tr>
-          ))}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

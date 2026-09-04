@@ -9,7 +9,12 @@
  * these statements for a non-admin even if this guard were deleted.
  */
 import { sendEmail } from "@/lib/email";
-import { getRequestById } from "@/lib/queries";
+import {
+  getActiveAdminEmails,
+  getActiveCompanyEmails,
+  getRequestById,
+} from "@/lib/queries";
+import { env } from "@/lib/env";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireAdmin } from "@/lib/auth";
@@ -239,7 +244,7 @@ export async function adminCancelLeaveAction(
             <strong>Days:</strong> ${request.leaveDays}
           </p>
 
-          <p>The leave days are no longer counted against your annual leave balance.</p>
+          <p>The cancelled leave is no longer counted as approved leave.</p>
 
           <p>You can view the request in ISX Leave.</p>
         `,
@@ -261,7 +266,6 @@ export async function adminCancelLeaveAction(
 
 /* ------------------------------------------------------------- employees */
 
-/* ------------------------------------------------------------- employees */
 const emergencyLeaveSchema = z.object({
   employeeId: z.string().uuid(),
   startDate: z.string().regex(
@@ -274,7 +278,10 @@ const emergencyLeaveSchema = z.object({
   ),
   reason: z.string()
     .trim()
-    .min(3, "Please provide a reason for the emergency leave.")
+    .min(
+      3,
+      "Please provide a reason for the emergency leave.",
+    )
     .max(1000),
 });
 
@@ -285,10 +292,18 @@ export async function createEmergencyLeaveAction(
   const me = await requireAdmin();
 
   const parsed = emergencyLeaveSchema.safeParse({
-    employeeId: String(formData.get("employeeId") ?? ""),
-    startDate: String(formData.get("startDate") ?? ""),
-    endDate: String(formData.get("endDate") ?? ""),
-    reason: String(formData.get("reason") ?? ""),
+    employeeId: String(
+      formData.get("employeeId") ?? "",
+    ),
+    startDate: String(
+      formData.get("startDate") ?? "",
+    ),
+    endDate: String(
+      formData.get("endDate") ?? "",
+    ),
+    reason: String(
+      formData.get("reason") ?? "",
+    ),
   });
 
   if (!parsed.success) {
@@ -314,7 +329,14 @@ export async function createEmergencyLeaveAction(
            reason,
            status
          )
-         values ($1, 'annual', $2::date, $3::date, $4, 'pending')`,
+         values (
+           $1,
+           'annual',
+           $2::date,
+           $3::date,
+           $4,
+           'pending'
+         )`,
         [
           d.employeeId,
           d.startDate,
@@ -329,7 +351,127 @@ export async function createEmergencyLeaveAction(
 
   revalidateAdmin();
 
-  return ok("Emergency leave has been added and is waiting for approval.");
+  return ok(
+    "Emergency leave has been added and is waiting for approval.",
+  );
+}
+
+
+/* --------------------------------------------------------- sick leave */
+
+const sickLeaveSchema = z.object({
+  employeeId: z.string().uuid(),
+
+  startDate: z.string().regex(
+    /^\d{4}-\d{2}-\d{2}$/,
+    "Choose a start date.",
+  ),
+
+  endDate: z.string().regex(
+    /^\d{4}-\d{2}-\d{2}$/,
+    "Choose an end date.",
+  ),
+
+  leaveSession: z.enum([
+    "full_day",
+    "morning",
+    "afternoon",
+  ]),
+
+  reason: z.string()
+    .trim()
+    .min(
+      2,
+      "Please provide a note for the sick leave.",
+    )
+    .max(1000),
+});
+
+export async function createSickLeaveAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  const me = await requireAdmin();
+
+  const parsed = sickLeaveSchema.safeParse({
+    employeeId: String(
+      formData.get("employeeId") ?? "",
+    ),
+    startDate: String(
+      formData.get("startDate") ?? "",
+    ),
+    endDate: String(
+      formData.get("endDate") ?? "",
+    ),
+    leaveSession: String(
+      formData.get("leaveSession") ?? "full_day",
+    ),
+    reason: String(
+      formData.get("reason") ?? "",
+    ),
+  });
+
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0];
+
+    return {
+      ok: false,
+      message: issue.message,
+      field: String(issue.path[0]),
+    };
+  }
+
+  const d = parsed.data;
+
+  if (d.endDate < d.startDate) {
+    return {
+      ok: false,
+      message:
+        "End date cannot be before the start date.",
+      field: "endDate",
+    };
+  }
+
+  if (
+    d.leaveSession !== "full_day" &&
+    d.startDate !== d.endDate
+  ) {
+    return {
+      ok: false,
+      message:
+        "Half-day sick leave must be for a single date.",
+      field: "endDate",
+    };
+  }
+
+  try {
+    await withUser(me.id, (db) =>
+      db.query(
+        `select app.create_sick_leave(
+           $1::uuid,
+           $2::date,
+           $3::date,
+           $4::public.leave_session,
+           $5::text
+         )`,
+        [
+          d.employeeId,
+          d.startDate,
+          d.endDate,
+          d.leaveSession,
+          d.reason,
+        ],
+      ),
+    );
+  } catch (e) {
+    return fail(e);
+  }
+
+  revalidateAdmin();
+
+  return ok(
+    "Sick leave has been added and approved.",
+  );
 }
 
 const employeeSchema = z.object({
@@ -541,6 +683,7 @@ export async function setWorkModeAction(
 
   const date = String(formData.get("date") ?? "");
   const mode = String(formData.get("mode") ?? "");
+  let changedFrom: "office" | "wfh" | null = null;
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return { ok: false, message: "Invalid work date." };
@@ -593,6 +736,8 @@ export async function setWorkModeAction(
         return;
       }
 
+      changedFrom = previousMode;
+
       const result = await db.query<{
         id: string;
       }>(
@@ -633,6 +778,44 @@ export async function setWorkModeAction(
   } catch (e) {
     return fail(e);
   }
+  if (changedFrom) {
+  try {
+    const recipients = await getActiveCompanyEmails(me.id);
+
+    if (recipients.length > 0) {
+      const fromLabel =
+        changedFrom === "office" ? "Office" : "WFH";
+      const toLabel =
+        mode === "office" ? "Office" : "WFH";
+
+      const [year, month] = date.split("-");
+      const calendarUrl =
+        `${env.appUrl}/calendar?y=${year}&m=${Number(month)}`;
+
+      await sendEmail({
+        to: recipients,
+        subject: `Work schedule updated — ${date}`,
+        html: `
+          <p>Hello,</p>
+          <p><strong>${me.name}</strong> updated the work schedule.</p>
+          <p>
+            <strong>Date:</strong> ${date}<br>
+            <strong>Change:</strong> ${fromLabel} → ${toLabel}
+          </p>
+          <p>
+            <a href="${calendarUrl}">View Calendar</a>
+          </p>
+        `,
+      });
+    }
+  } catch (emailError) {
+    console.error(
+      "[email] Failed to send work schedule notification:",
+      emailError,
+    );
+  }
+}
+
 
   revalidateAdmin();
 
@@ -650,38 +833,199 @@ const holidaySchema = z.object({
   source: z.string().trim().max(40).optional(),
 });
 
-export async function addHolidayAction(_prev: AdminFormState, formData: FormData): Promise<AdminFormState> {
+export async function addHolidayAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
   const me = await requireAdmin();
+
   const parsed = holidaySchema.safeParse({
     date: String(formData.get("date") ?? ""),
     name: String(formData.get("name") ?? ""),
     type: String(formData.get("type") ?? "company"),
     source: String(formData.get("source") ?? "").trim() || undefined,
   });
+
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
-    return { ok: false, message: issue.message, field: String(issue.path[0]) };
+    return {
+      ok: false,
+      message: issue.message,
+      field: String(issue.path[0]),
+    };
   }
+
   const d = parsed.data;
+
   try {
-    await withUser(me.id, (db) => db.query(
-      `insert into holidays (holiday_date, name, type, source)
-       values ($1::date, $2, $3, $4)
-       on conflict (holiday_date, name) do update set active = true, type = excluded.type`,
-      [d.date, d.name, d.type, d.source ?? (d.type === "public" ? "BOT" : "ISX")]));
-  } catch (e) { return fail(e); }
+    await withUser(me.id, (db) =>
+      db.query(
+        `insert into holidays (holiday_date, name, type, source)
+         values ($1::date, $2, $3, $4)
+         on conflict (holiday_date, name)
+         do update set
+           active = true,
+           type = excluded.type`,
+        [
+          d.date,
+          d.name,
+          d.type,
+          d.source ?? (d.type === "public" ? "BOT" : "ISX"),
+        ],
+      ),
+    );
+  } catch (e) {
+    return fail(e);
+  }
+
+  // Email notification is best-effort.
+  try {
+    const recipients = await getActiveCompanyEmails(me.id);
+
+    if (recipients.length > 0) {
+      const [year, month] = d.date.split("-");
+      const calendarUrl =
+        `${env.appUrl}/calendar?y=${year}&m=${Number(month)}`;
+
+      await sendEmail({
+        to: recipients,
+        subject: `Holiday calendar updated — ${d.date}`,
+        html: `
+          <p>Hello,</p>
+
+          <p><strong>${me.name}</strong> updated the company calendar.</p>
+
+          <p>
+            <strong>Holiday:</strong> ${d.name}<br>
+            <strong>Date:</strong> ${d.date}<br>
+            <strong>Action:</strong> Added
+          </p>
+
+          <p>
+            <a href="${calendarUrl}">View Calendar</a>
+          </p>
+        `,
+      });
+    }
+  } catch (emailError) {
+    console.error(
+      "[email] Failed to send holiday notification:",
+      emailError,
+    );
+  }
+
   revalidateAdmin();
+
   return ok(`${d.name} added to the holiday calendar.`);
 }
 
-export async function toggleHolidayAction(_prev: AdminFormState, formData: FormData): Promise<AdminFormState> {
+export async function toggleHolidayAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
   const me = await requireAdmin();
   const id = String(formData.get("id") ?? "");
+
+  if (!id) {
+    return { ok: false, message: "Missing holiday id." };
+  }
+
+  let holiday:
+    | {
+        name: string;
+        date: string;
+        wasActive: boolean;
+      }
+    | undefined;
+
   try {
-    await withUser(me.id, (db) => db.query("update holidays set active = not active where id = $1", [id]));
-  } catch (e) { return fail(e); }
+    holiday = await withUser(me.id, async (db) => {
+      const current = await db.query<{
+        name: string;
+        holiday_date: string;
+        active: boolean;
+      }>(
+        `select
+           name,
+           holiday_date::text as holiday_date,
+           active
+         from holidays
+         where id = $1::uuid`,
+        [id],
+      );
+
+      const row = current.rows[0];
+
+      if (!row) {
+        throw new Error("Holiday not found.");
+      }
+
+      await db.query(
+        `update holidays
+         set active = not active,
+             updated_at = now()
+         where id = $1::uuid`,
+        [id],
+      );
+
+      return {
+        name: row.name,
+        date: row.holiday_date,
+        wasActive: row.active,
+      };
+    });
+  } catch (e) {
+    return fail(e);
+  }
+
+  if (holiday) {
+    try {
+      const recipients = await getActiveCompanyEmails(me.id);
+
+      if (recipients.length > 0) {
+        const [year, month] = holiday.date.split("-");
+        const calendarUrl =
+          `${env.appUrl}/calendar?y=${year}&m=${Number(month)}`;
+
+        const action = holiday.wasActive
+          ? "Removed"
+          : "Enabled";
+
+        await sendEmail({
+          to: recipients,
+          subject: `Holiday calendar updated — ${holiday.date}`,
+          html: `
+            <p>Hello,</p>
+
+            <p><strong>${me.name}</strong> updated the company calendar.</p>
+
+            <p>
+              <strong>Holiday:</strong> ${holiday.name}<br>
+              <strong>Date:</strong> ${holiday.date}<br>
+              <strong>Action:</strong> ${action}
+            </p>
+
+            <p>
+              <a href="${calendarUrl}">View Calendar</a>
+            </p>
+          `,
+        });
+      }
+    } catch (emailError) {
+      console.error(
+        "[email] Failed to send holiday notification:",
+        emailError,
+      );
+    }
+  }
+
   revalidateAdmin();
-  return ok("Holiday updated.");
+
+  return ok(
+    holiday?.wasActive
+      ? `${holiday.name} removed from the holiday calendar.`
+      : `${holiday?.name ?? "Holiday"} enabled.`,
+  );
 }
 
 /**
@@ -722,8 +1066,64 @@ export async function importHolidaysAction(_prev: AdminFormState, formData: Form
           [h.date, h.name, h.nameTh ?? null, parsed.source ?? "BOT", h.note ?? null]);
       }
     });
-  } catch (e) { return fail(e); }
+  } catch (e) {
+    return fail(e);
+  }
+
+  // One summary email for the whole import.
+  try {
+    const recipients = await getActiveCompanyEmails(me.id);
+
+    if (recipients.length > 0) {
+      const dates = list
+        .map((h) => h.date)
+        .sort();
+
+      const firstDate = dates[0];
+      const [year, month] = firstDate.split("-");
+
+      const calendarUrl =
+        `${env.appUrl}/calendar?y=${year}&m=${Number(month)}`;
+
+      const holidayRows = list
+        .map(
+          (h) =>
+            `<li><strong>${h.date}</strong> — ${h.name}</li>`,
+        )
+        .join("");
+
+      await sendEmail({
+        to: recipients,
+        subject: `Holiday calendar updated — ${list.length} holidays imported`,
+        html: `
+          <p>Hello,</p>
+
+          <p><strong>${me.name}</strong> updated the company holiday calendar.</p>
+
+          <p>
+            <strong>Action:</strong> Holiday import<br>
+            <strong>Imported:</strong> ${list.length} holidays
+          </p>
+
+          <ul>
+            ${holidayRows}
+          </ul>
+
+          <p>
+            <a href="${calendarUrl}">View Calendar</a>
+          </p>
+        `,
+      });
+    }
+  } catch (emailError) {
+    console.error(
+      "[email] Failed to send holiday import notification:",
+      emailError,
+    );
+  }
+
   revalidateAdmin();
+
   return ok(`Imported ${list.length} holidays.`);
 }
 
@@ -978,7 +1378,60 @@ if (data.length === 0) {
   } catch (e) {
     return fail(e);
   }
+    // One summary email for the whole BOT sync.
+  try {
+    const recipients = await getActiveCompanyEmails(me.id);
 
+    if (recipients.length > 0) {
+      const calendarUrl =
+        `${env.appUrl}/calendar?y=${year}&m=1`;
+
+      const holidayRows = data
+        .filter((h) => /^\d{4}-\d{2}-\d{2}$/.test(h.Date))
+        .sort((a, b) => a.Date.localeCompare(b.Date))
+        .map(
+          (h) =>
+            `<li><strong>${h.Date}</strong> — ${h.HolidayDescription}</li>`,
+        )
+        .join("");
+
+      await sendEmail({
+        to: recipients,
+        subject: `Holiday calendar updated — ${year} BOT holidays synced`,
+        html: `
+          <p>Hello,</p>
+
+          <p><strong>${me.name}</strong> synced the public holiday calendar.</p>
+
+          <p>
+            <strong>Action:</strong> BOT holiday sync<br>
+            <strong>Year:</strong> ${year}<br>
+            <strong>Holidays:</strong> ${data.length}<br>
+            <strong>Source:</strong> ${syncSource}
+          </p>
+
+          <ul>
+            ${holidayRows}
+          </ul>
+
+          <p>
+            <a href="${calendarUrl}">View Calendar</a>
+          </p>
+        `,
+      });
+    }
+  } catch (emailError) {
+    console.error(
+      "[email] Failed to send BOT holiday sync notification:",
+      emailError,
+    );
+  }
+
+  revalidateAdmin();
+  revalidatePath("/calendar");
+  revalidatePath("/dashboard");
+
+  return ok(`Synced ${data.length} BOT holidays for ${year}.`);
   revalidateAdmin();
   revalidatePath("/calendar");
   revalidatePath("/dashboard");

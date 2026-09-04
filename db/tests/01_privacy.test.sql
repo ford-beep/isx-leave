@@ -51,8 +51,8 @@ select pg_temp.eq((select count(*) from leave_requests where employee_id <> :'ja
   'Jane sees zero leave requests belonging to anyone else');
 select pg_temp.eq((select count(distinct employee_id) from leave_requests)::int, 1,
   'Jane sees exactly one distinct employee_id in leave_requests');
-select pg_temp.eq((select count(*) from leave_requests)::int, 4,
-  'Jane sees all four of her own requests');
+select pg_temp.eq((select count(*) from leave_requests)::int, 3,
+  'Jane sees all three of her own requests');
 
 -- Try to reach John's rows by every obvious lever an attacker has.
 select pg_temp.eq((select count(*) from leave_requests where employee_id = :'john'::uuid)::int, 0,
@@ -62,7 +62,7 @@ select pg_temp.eq((select count(*) from leave_requests where start_date = '2026-
 select pg_temp.eq((select count(*) from leave_requests where reason ilike '%Japan%')::int, 0,
   'Jane: searching John''s reason text leaks nothing');
 select pg_temp.eq((select count(*) from leave_requests lr where lr.id in
-    (select id from leave_requests))::int, 4,
+    (select id from leave_requests))::int, 3,
   'Jane: subquery re-entry does not widen visibility');
 
 -- ---------------------------------------------------------------------------

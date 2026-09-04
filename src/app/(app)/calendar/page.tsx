@@ -2,9 +2,9 @@ import { requireUser } from "@/lib/auth";
 import { companyToday, formatDate, WEEKDAY_NAMES } from "@/lib/date";
 import {
   getCalendarBirthdays,
+  getCompanyLeaveCalendar,
   getHolidays,
   getOfficeDays,
-  getRequestsInMonth,
   getWorkSchedule,
 } from "@/lib/queries";
 import { Card, CardHead } from "@/components/ui";
@@ -23,14 +23,14 @@ export default async function CalendarPage({
   const year = Number(sp.y) || Number(today.slice(0, 4));
   const month = Number(sp.m) || Number(today.slice(5, 7));
 
-  const [office, holidays, requests, workSchedule, birthdays] =
-    await Promise.all([
-      getOfficeDays(me.id),
-      getHolidays(me.id, year),
-      getRequestsInMonth(me.id, year, month, me.id),
-      getWorkSchedule(me.id, year, month),
-      getCalendarBirthdays(me.id),
-    ]);
+  const [office, holidays, companyLeaves, workSchedule, birthdays] =
+  await Promise.all([
+    getOfficeDays(me.id),
+    getHolidays(me.id, year),
+    getCompanyLeaveCalendar(me.id, year, month),
+    getWorkSchedule(me.id, year, month),
+    getCalendarBirthdays(me.id),
+  ]);
 
   const monthHolidays = holidays.filter(
     (h) => h.active && Number(h.date.slice(5, 7)) === month,
@@ -52,17 +52,18 @@ export default async function CalendarPage({
       <div className="grid-2">
         <Card>
           <div className="card-body">
-            <MonthCalendar
-              year={year}
-              month={month}
-              officeWeekdays={office.weekdays}
-              holidays={holidays}
-              requests={requests}
-              birthdays={birthdays}
-              mode="employee"
-              basePath="/calendar"
-              workSchedule={workSchedule}
-            />
+          <MonthCalendar
+  year={year}
+  month={month}
+  officeWeekdays={office.weekdays}
+  holidays={holidays}
+  requests={[]}
+  companyLeaves={companyLeaves}
+  birthdays={birthdays}
+  mode="employee"
+  basePath="/calendar"
+  workSchedule={workSchedule}
+/>
           </div>
         </Card>
 
@@ -99,16 +100,15 @@ export default async function CalendarPage({
             </div>
           </Card>
 
-          <Card>
-            <CardHead title="Your leave, privately" />
-            <div className="card-body">
-              <p className="muted-sm">
-                This calendar shows only your own leave. Other people&apos;s
-                time off isn&apos;t visible to you — the database refuses to
-                return it, not just the screen.
-              </p>
-            </div>
-          </Card>
+<Card>
+  <CardHead title="Company leave" />
+  <div className="card-body">
+    <p className="muted-sm">
+      Approved leave is visible to the team by name and date only.
+      Leave type, reason and other private details remain hidden.
+    </p>
+  </div>
+</Card>
         </div>
       </div>
     </>

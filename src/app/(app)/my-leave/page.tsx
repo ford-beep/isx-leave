@@ -23,8 +23,9 @@ function formatDate(date: string) {
 }
 
 export default async function MyLeavePage() {
-  const me = await requireUser();
-  const year = Number(companyToday().slice(0, 4));
+ const me = await requireUser();
+const today = companyToday();
+const year = Number(today.slice(0, 4));
 
   const [requests, balance, compBalance, compCredits] =
     await Promise.all([
@@ -203,17 +204,19 @@ export default async function MyLeavePage() {
 
           <div className="card-body flush">
             <LeaveTable
-              requests={requests}
-              emptyAction={
-                <Link
-                  href="/request"
-                  className="btn btn-primary"
-                >
-                  <IconPlus size={16} />
-                  Request leave
-                </Link>
-              }
-            />
+  requests={requests}
+  allowSelfCancel
+  today={today}
+  emptyAction={
+    <Link
+      href="/request"
+      className="btn btn-primary"
+    >
+      <IconPlus size={16} />
+      Request leave
+    </Link>
+  }
+/>
           </div>
         </Card>
       </div>

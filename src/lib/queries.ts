@@ -236,6 +236,25 @@ export async function getCompDayBalance(
   };
 }
 
+export async function getSickLeaveUsed(
+  me: string,
+  employeeId: string,
+  year: number,
+): Promise<number> {
+  const r = await oneAs<Record<string, any>>(
+    me,
+    `select coalesce(sum(leave_days), 0)::float8 as used
+       from leave_requests
+      where employee_id = $1
+        and leave_year = $2
+        and leave_type = 'sick'
+        and status = 'approved'`,
+    [employeeId, year],
+  );
+
+  return Number(r?.used ?? 0);
+}
+
 export async function getCompDayCredits(
   me: string,
   employeeId: string,
@@ -344,6 +363,59 @@ export async function getActiveAdminEmails(me: string): Promise<string[]> {
     .filter((email) => !email.endsWith("@demo.isx.local"));
 }
 
+export async function getActiveCompanyEmails(me: string): Promise<string[]> {
+  const rows = await queryAs<{ email: string }>(
+    me,
+    `select email
+       from users
+      where active = true
+      order by email`,
+  );
+
+  return rows
+    .map((row) => row.email)
+    .filter((email) => !email.endsWith("@demo.isx.local"));
+}
+
+export interface CompanyCalendarLeave {
+  employeeId: string;
+  employeeName: string;
+  startDate: string;
+  endDate: string;
+  isMyLeave: boolean;
+}
+
+export async function getCompanyLeaveCalendar(
+  me: string,
+  year: number,
+  month1: number,
+): Promise<CompanyCalendarLeave[]> {
+  const monthStart = `${year}-${String(month1).padStart(2, "0")}-01`;
+
+  const rows = await queryAs<Record<string, any>>(
+    me,
+    `select
+       employee_id,
+       employee_name,
+       start_date::text as start_date,
+       end_date::text as end_date,
+       is_my_leave
+     from app.company_leave_calendar(
+       $1::date,
+       ($1::date + interval '1 month - 1 day')::date
+     )`,
+    [monthStart],
+  );
+
+  return rows.map((r) => ({
+    employeeId: r.employee_id,
+    employeeName: r.employee_name,
+    startDate: r.start_date,
+    endDate: r.end_date,
+    isMyLeave: r.is_my_leave,
+  }));
+}
+
 /* ------------------------------------------------------------- admin side */
 
 export async function getPendingRequests(me: string): Promise<LeaveRequest[]> {
@@ -431,6 +503,7 @@ export interface EmployeeOverview extends UserRow {
   used: number;
   pending: number;
   remaining: number;
+  sickLeaveUsed: number;
 }
 
 /** Roster with balances. Employees see only themselves; admins see everyone. */
@@ -440,27 +513,52 @@ export async function getEmployeeOverview(
 ): Promise<EmployeeOverview[]> {
   const rows = await queryAs<Record<string, any>>(
     me,
-    `select u.id, u.name, u.email, u.role, u.active, u.job_title,
-       u.birthday::text as birthday, u.created_at,
-            b.entitlement::float8, b.approved::float8, b.pending::float8, b.remaining::float8
-       from users u, lateral app.leave_balance(u.id, $1) b
-      order by u.active desc, u.name`,
+    `select
+     u.id,
+     u.name,
+     u.email,
+     u.role,
+     u.active,
+     u.job_title,
+     u.birthday::text as birthday,
+     u.created_at,
+     b.entitlement::float8,
+     b.approved::float8,
+     b.pending::float8,
+     b.remaining::float8,
+     coalesce(s.sick_leave_used, 0)::float8
+       as sick_leave_used
+   from users u
+   cross join lateral app.leave_balance(u.id, $1) b
+   left join lateral (
+     select coalesce(sum(lr.leave_days), 0)
+       as sick_leave_used
+     from leave_requests lr
+     where lr.employee_id = u.id
+       and lr.leave_year = $1
+       and lr.leave_type = 'sick'
+       and lr.status = 'approved'
+   ) s on true
+  order by u.active desc, u.name`,
     [year],
   );
-  return rows.map((r) => ({
-    id: r.id,
-    name: r.name,
-    email: r.email,
-    role: r.role,
-    active: r.active,
-    jobTitle: r.job_title,
-    birthday: r.birthday ?? null,
-    createdAt: r.created_at,
-    entitlement: Number(r.entitlement),
-    used: Number(r.approved),
-    pending: Number(r.pending),
-    remaining: Number(r.remaining),
-  }));
+return rows.map((r) => ({
+  id: r.id,
+  name: r.name,
+  email: r.email,
+  role: r.role,
+  active: r.active,
+  jobTitle: r.job_title,
+  birthday: r.birthday ?? null,
+  createdAt: r.created_at,
+  entitlement: Number(r.entitlement),
+  used: Number(r.approved),
+  pending: Number(r.pending),
+  remaining: Number(r.remaining),
+  sickLeaveUsed: Number(
+    r.sick_leave_used ?? 0,
+  ),
+}));
 }
 
 export interface CalendarBirthday {

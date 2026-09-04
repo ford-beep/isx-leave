@@ -14,11 +14,34 @@ const STATUSES = ["pending", "approved", "rejected", "cancelled", "all"] as cons
 
 export default async function AdminRequestsPage({
   searchParams,
-}: { searchParams: Promise<{ status?: string; employee?: string }> }) {
+}: {
+  searchParams: Promise<{
+    status?: string;
+    employee?: string;
+    request?: string;
+  }>;
+}) {
   const me = await requireAdmin();
-  const sp = await searchParams;
-  const status = STATUSES.includes(sp.status as never) ? sp.status! : "pending";
-  const employeeId = sp.employee && sp.employee !== "all" ? sp.employee : undefined;
+const sp = await searchParams;
+
+const requestId =
+  sp.request &&
+  /^[0-9a-f-]{36}$/i.test(sp.request)
+    ? sp.request
+    : undefined;
+
+const status = STATUSES.includes(
+  sp.status as never,
+)
+  ? sp.status!
+  : requestId
+    ? "all"
+    : "pending";
+
+const employeeId =
+  sp.employee && sp.employee !== "all"
+    ? sp.employee
+    : undefined;
 
   const [requests, employees] = await Promise.all([
     getAllRequests(me.id, { status, employeeId }),
@@ -26,7 +49,15 @@ export default async function AdminRequestsPage({
   ]);
 
   const link = (s: string) =>
-    `/admin/requests?status=${s}${employeeId ? `&employee=${employeeId}` : ""}`;
+  `/admin/requests?status=${s}${
+    employeeId
+      ? `&employee=${employeeId}`
+      : ""
+  }${
+    requestId
+      ? `&request=${requestId}`
+      : ""
+  }`;
 
   return (
     <>
@@ -36,9 +67,21 @@ export default async function AdminRequestsPage({
     <p className="muted">Every request across the company, with full history.</p>
   </div>
 
-  <Link href="/admin/requests/emergency" className="btn btn-primary">
+<div className="row-wrap">
+  <Link
+    href="/admin/requests/sick"
+    className="btn"
+  >
+    Add sick leave
+  </Link>
+
+  <Link
+    href="/admin/requests/emergency"
+    className="btn btn-primary"
+  >
     Add emergency leave
   </Link>
+</div>
 </div>
 
       <Card>
@@ -78,7 +121,21 @@ export default async function AdminRequestsPage({
                 </thead>
                 <tbody>
                   {requests.map((r) => (
-                    <tr key={r.id}>
+                    <tr
+  key={r.id}
+  id={`request-${r.id}`}
+  style={
+    requestId === r.id
+      ? {
+          background:
+            "var(--surface-accent, rgba(99, 102, 241, 0.08))",
+          outline:
+            "2px solid var(--c-accent)",
+          outlineOffset: "-2px",
+        }
+      : undefined
+  }
+>
                       <td data-label="Employee">
                         <Link href={`/admin/employees/${r.employeeId}`}>
                           <Person name={r.employeeName!} email={r.employeeEmail} />

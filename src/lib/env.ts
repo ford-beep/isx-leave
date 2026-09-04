@@ -26,6 +26,7 @@ export const env = {
   authSecret: required("AUTH_SECRET"),
   sessionTtlSeconds: Number(optional("SESSION_TTL_SECONDS", "28800")),
   companyTimezone: optional("COMPANY_TIMEZONE", "Asia/Bangkok"),
+  appUrl: optional("APP_URL", "http://localhost:3000"),
   defaultEntitlement: Number(optional("DEFAULT_ANNUAL_ENTITLEMENT", "15")),
   /** Enables the one-click demo logins on the sign-in screen. Must be off in prod. */
   demoMode: optional("DEMO_MODE", "false") === "true" && process.env.NODE_ENV !== "production",

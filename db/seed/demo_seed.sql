@@ -33,10 +33,8 @@ on conflict (key) do update set value = excluded.value, updated_at = now();
 -- Leave types (§6 — extensible catalogue, not an enum)
 -- --------------------------------------------------------------------------
 insert into public.leave_types (code, label, description, deducts_balance, sort_order) values
-  ('annual',   'Annual Leave',   'Paid time off from the yearly entitlement.',            true,  10),
-  ('personal', 'Personal Leave', 'Personal business (Thai: ลากิจ).',                       true,  20),
-  ('sick',     'Sick Leave',     'Illness. Medical certificate may be requested.',        true,  30),
-  ('other',    'Other',          'Anything not covered above — explain in the reason.',   true,  40)
+  ('annual', 'Annual Leave', 'Paid time off from the yearly entitlement.', true, 10),
+  ('sick',   'Sick Leave',   'Illness. Medical certificate may be requested.', false, 30)
 on conflict (code) do update
   set label = excluded.label,
       description = excluded.description,
@@ -175,23 +173,18 @@ begin
   r := pg_temp.submit(jane, 'annual', '2026-09-18', '2026-09-22', 'Long weekend');
   perform pg_temp.decide(admin_id, r, 'approved');
 
-  -- Pending — spans a public holiday (13 Oct) so only 1 day is deducted.
-  perform pg_temp.submit(jane, 'personal', '2026-10-12', '2026-10-13', 'Apartment move');
+
+
 
   -- Rejected, with a reason (28 & 29 Jul are holidays, so 1 day was requested)
   r := pg_temp.submit(jane, 'annual', '2026-07-27', '2026-07-29', 'Extending the holiday week');
   perform pg_temp.decide(admin_id, r, 'rejected', 'Client shoot scheduled that Monday — please re-submit for a later week.');
 
   -- ---- John -------------------------------------------------------------
-  r := pg_temp.submit(john, 'sick', '2026-05-11', '2026-05-12', 'Flu');
-  perform pg_temp.decide(admin_id, r, 'approved');
-
   perform pg_temp.submit(john, 'annual', '2026-08-24', '2026-09-01', 'Holiday in Japan');
 
   -- ---- Mike -------------------------------------------------------------
-  -- Mon 2 Mar counts; Tue 3 Mar is Makha Bucha Day, so 1 day deducted.
-  r := pg_temp.submit(mike, 'personal', '2026-03-02', '2026-03-03', 'Visa appointment');
-  perform pg_temp.decide(admin_id, r, 'approved');
+
 
   -- Imminent approved leave, so the admin dashboard has something upcoming.
   r := pg_temp.submit(mike, 'annual', '2026-08-17', '2026-08-18', 'Short break');
