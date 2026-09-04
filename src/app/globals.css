@@ -450,6 +450,33 @@ table.tbl .actions { display: flex; gap: 6px; justify-content: flex-end; }
 .cal-tag.approved { background: #cff0dd; color: #05603a; }
 .cal-tag.pending  { background: #fdeec6; color: #93370d; }
 .cal-tag.more     { background: transparent; color: var(--c-ink-3); font-weight: 500; padding-left: 2px; }
+.cal-more-button {
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 2px;
+  margin: 0;
+  color: var(--c-ink-3);
+  font: inherit;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cal-more-button:hover {
+  color: var(--c-ink-2);
+  text-decoration: underline;
+}
+
+.cal-more-button:focus {
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+}
 .cal-office-dot {
   position: absolute; top: 8px; right: 8px;
   width: 6px; height: 6px; border-radius: 999px; background: #7b93f5;

@@ -13,6 +13,7 @@ import type {
   CompanyCalendarLeave,
 } from "@/lib/queries";
 import { IconChevronLeft, IconChevronRight } from "./icons";
+import { ExpandableCalendarEntries } from "./ExpandableCalendarEntries";
 
 export interface CalendarProps {
   year: number;
@@ -324,29 +325,11 @@ export function MonthCalendar({
                     </>
                   ))}
 
-                {entries
-                  .slice(0, 2)
-                  .map((e, i) => (
-                    <div
-                      key={`${date}-${e.label}-${i}`}
-                      className={`cal-tag ${e.status}`}
-                      title={e.title}
-                    >
-                      {e.label}
-                    </div>
-                  ))}
-
-                {entries.length > 2 && (
-                  <div
-                    className="cal-tag more"
-                    title={entries
-                      .slice(2)
-                      .map((e) => e.label)
-                      .join(", ")}
-                  >
-                    +{entries.length - 2} more
-                  </div>
-                )}
+   <ExpandableCalendarEntries
+  date={date}
+  entries={entries}
+  initialLimit={3}
+/>
 
                 {dayBirthdays
                   .slice(0, 2)
