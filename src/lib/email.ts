@@ -9,6 +9,9 @@ const smtpPort = Number(process.env.SMTP_PORT ?? 587);
 const smtpUser = process.env.SMTP_USER;
 const smtpPass = process.env.SMTP_PASS;
 
+const emailTestRecipient =
+  process.env.EMAIL_TEST_RECIPIENT?.trim();
+
 const transporter = nodemailer.createTransport({
   host: smtpHost,
   port: smtpPort,
@@ -37,9 +40,25 @@ export async function sendEmail({
     throw new Error("SMTP email configuration is incomplete.");
   }
 
+  const isProduction =
+    process.env.NODE_ENV === "production";
+
+  const actualTo =
+    !isProduction && emailTestRecipient
+      ? emailTestRecipient
+      : Array.isArray(to)
+        ? to.join(", ")
+        : to;
+
+  if (!isProduction && emailTestRecipient) {
+    console.log(
+      `[email] Test mode: redirecting email to ${emailTestRecipient}`,
+    );
+  }
+
   return transporter.sendMail({
     from: `ISX Leave <${smtpUser}>`,
-    to: Array.isArray(to) ? to.join(", ") : to,
+    to: actualTo,
     subject,
     html,
   });

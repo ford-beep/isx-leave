@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   addHolidayAction,
@@ -38,7 +38,11 @@ const [toggleState, toggleAction] = useActionState(toggleHolidayAction, null);
  useActionToast(impState);
  useActionToast(syncState);
  useActionToast(toggleState);
-
+useEffect(() => {
+  if (toggleState?.ok) {
+    router.refresh();
+  }
+}, [toggleState, router]);
   if (addState?.ok && addOpen) setTimeout(() => setAddOpen(false), 0);
   if (impState?.ok && importOpen) setTimeout(() => setImportOpen(false), 0);
 
