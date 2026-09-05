@@ -72,18 +72,6 @@ const requestSchema = z
           "Half Day leave must be for a single date.",
       });
     }
-
-    if (
-      data.leaveType === "comp_day" &&
-      data.startDate !== data.endDate
-    ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["endDate"],
-        message:
-          "Compensatory Leave must be for a single date.",
-      });
-    }
   });
 
 function sessionLabel(session: LeaveSession) {
@@ -345,22 +333,203 @@ export async function previewLeaveAction(
     };
   }
 
-  if (
-    leaveType === "comp_day" &&
-    startDate !== endDate
-  ) {
+/*
+ * Compensatory Leave:
+ * Full Day may span a date range.
+ * Only eligible WFH weekdays are deducted.
+ * Weekends, holidays, and Office days are skipped.
+ *
+ * Half Day remains a single-date request.
+ */
+if (leaveType === "comp_day") {
+  try {
+    const rows = await withUser(
+      me.id,
+      async (db) => {
+        const result = await db.query<{
+          date: string;
+          mode: "office" | "wfh";
+          is_weekend: boolean;
+          holiday_name: string | null;
+          holiday_type:
+            | "public"
+            | "company"
+            | null;
+          holiday_source: string | null;
+        }>(
+                  `
+            select
+              d::date::text as date,
+
+              app.effective_work_mode(
+                d::date
+              ) as mode,
+
+              extract(
+                isodow from d::date
+              ) in (6, 7) as is_weekend,
+
+              (
+                select h.name
+                from public.holidays h
+                where h.holiday_date = d::date
+                  and h.active
+                order by h.name
+                limit 1
+              ) as holiday_name,
+
+              (
+                select h.type::text
+                from public.holidays h
+                where h.holiday_date = d::date
+                  and h.active
+                order by h.name
+                limit 1
+              ) as holiday_type,
+
+              (
+                select h.source
+                from public.holidays h
+                where h.holiday_date = d::date
+                  and h.active
+                order by h.name
+                limit 1
+              ) as holiday_source
+
+            from generate_series(
+              $1::date,
+              $2::date,
+              interval '1 day'
+            ) d
+
+            order by d
+          `,
+          [startDate, endDate],
+        );
+
+        return result.rows;
+      },
+    );
+
+    const days = rows.map((row) => {
+      const deducted =
+        !row.is_weekend &&
+        !row.holiday_name &&
+        row.mode === "wfh";
+
+      return {
+        date: row.date,
+        officeDay:
+          row.mode === "office",
+        holiday: row.holiday_name,
+        deducted,
+      };
+    });
+
+    const leaveDays = isHalfDay
+      ? 0.5
+      : days.filter(
+          (day) => day.deducted,
+        ).length;
+
+    /*
+     * Half Day still has to be an eligible
+     * WFH date. Since Half Day is always
+     * single-date, rows[0] is authoritative.
+     */
+    if (isHalfDay) {
+      const day = rows[0];
+
+      if (day?.is_weekend) {
+        return {
+          ok: false,
+          message:
+            "Compensatory Leave cannot be used on weekends.",
+        };
+      }
+
+      if (day?.holiday_name) {
+        return {
+          ok: false,
+          message:
+            "Compensatory Leave cannot be used on company holidays.",
+        };
+      }
+
+      if (day?.mode !== "wfh") {
+        return {
+          ok: false,
+          message:
+            "Compensatory Leave can only be used on WFH days.",
+        };
+      }
+    }
+
+    if (leaveDays === 0) {
+      return {
+        ok: false,
+        message:
+          "This range does not contain any eligible WFH days.",
+      };
+    }
+
+    const holidays = rows
+      .filter(
+        (row) =>
+          row.holiday_name &&
+          row.holiday_type,
+      )
+      .map((row) => ({
+        date: row.date,
+        name: row.holiday_name!,
+        type: row.holiday_type!,
+        source:
+          row.holiday_source ?? "",
+        wouldHaveBeenOfficeDay:
+          row.mode === "office",
+      }));
+
+    return {
+      ok: true,
+      calc: {
+        startDate,
+        endDate,
+        totalCalendarDays: rows.length,
+
+        officeDaysInRange:
+          rows.filter(
+            (row) =>
+              row.mode === "office",
+          ).length,
+
+        excludedNonOfficeDays:
+          days.filter(
+            (day) =>
+              !day.deducted &&
+              !day.holiday,
+          ).length,
+
+        excludedHolidays:
+          holidays.length,
+
+        leaveDays,
+        holidays,
+        days,
+      },
+    };
+  } catch (e) {
     return {
       ok: false,
       message:
-        "Compensatory Leave must be for a single date.",
+        toFriendlyError(e).message,
     };
   }
+}
 
   /*
-   * Half Day Annual Leave and all Comp Day requests
-   * need date eligibility information.
+   * Half Day Annual Leave needs date eligibility information.
    */
-  if (leaveType === "comp_day" || isHalfDay) {
+  if (isHalfDay) {
     try {
       const result = await withUser(
         me.id,
@@ -399,9 +568,7 @@ export async function previewLeaveAction(
         return {
           ok: false,
           message:
-            leaveType === "comp_day"
-              ? "Compensatory Leave cannot be used on weekends."
-              : "Half Day leave cannot be used on weekends.",
+            "Half Day leave cannot be used on weekends.",
         };
       }
 
@@ -409,24 +576,11 @@ export async function previewLeaveAction(
         return {
           ok: false,
           message:
-            leaveType === "comp_day"
-              ? "Compensatory Leave cannot be used on company holidays."
-              : "Half Day leave cannot be used on company holidays.",
+            "Half Day leave cannot be used on company holidays.",
         };
       }
 
-      if (
-        leaveType === "comp_day" &&
-        result.mode !== "wfh"
-      ) {
-        return {
-          ok: false,
-          message:
-            "Compensatory Leave can only be used on WFH days.",
-        };
-      }
-
-      const leaveDays = isHalfDay ? 0.5 : 1;
+      const leaveDays = 0.5;
 
       return {
         ok: true,

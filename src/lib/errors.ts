@@ -133,7 +133,7 @@ const MAP: Array<
     }),
   ],
 
-  // ---------------------------------------------------------
+    // ---------------------------------------------------------
   // Comp Day — employee request
   // ---------------------------------------------------------
 
@@ -141,8 +141,25 @@ const MAP: Array<
     /COMP_DAY_SINGLE_DAY_ONLY/,
     () => ({
       message:
-        "Compensatory Leave must be taken as exactly one full day.",
+        "Half Day Compensatory Leave must be for a single date.",
+      field: "endDate",
+    }),
+  ],
+
+  [
+    /COMP_DAY_NO_ELIGIBLE_WFH_DAYS/,
+    () => ({
+      message:
+        "This range doesn't contain any eligible WFH days. Office days, weekends, and company holidays are skipped.",
       field: "startDate",
+    }),
+  ],
+
+  [
+    /COMP_DAY_ELIGIBILITY_CHANGED/,
+    () => ({
+      message:
+        "The work schedule or holiday settings changed after this request was submitted. Please reject or cancel this request and submit a new one.",
     }),
   ],
 
@@ -186,7 +203,7 @@ const MAP: Array<
     () => ({
       message:
         "You don't have enough available Comp Days for this request.",
-      field: "startDate",
+      field: "endDate",
     }),
   ],
 

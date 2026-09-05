@@ -84,9 +84,7 @@ export function RequestForm({
     leaveSession === "morning" ||
     leaveSession === "afternoon";
 
-  const isSingleDay =
-    leaveType === "comp_day" ||
-    isHalfDay;
+  const isSingleDay = isHalfDay;
 
   const earliestStartDate = (() => {
     const d = new Date(
@@ -162,42 +160,28 @@ export function RequestForm({
       ? state.message
       : undefined;
 
-  function changeLeaveType(
-    nextType: LeaveType,
+function changeLeaveType(
+  nextType: LeaveType,
+) {
+  setLeaveType(nextType);
+  setCalc(null);
+  setCalcError(null);
+}
+
+function changeSession(
+  nextSession: LeaveSession,
+) {
+  setLeaveSession(nextSession);
+  setCalc(null);
+  setCalcError(null);
+
+  if (
+    nextSession !== "full_day" &&
+    startDate
   ) {
-    setLeaveType(nextType);
-    setCalc(null);
-    setCalcError(null);
-
-    if (
-      nextType === "comp_day" &&
-      startDate
-    ) {
-      setEndDate(startDate);
-    }
+    setEndDate(startDate);
   }
-
-  function changeSession(
-    nextSession: LeaveSession,
-  ) {
-    setLeaveSession(nextSession);
-    setCalc(null);
-    setCalcError(null);
-
-    if (
-      nextSession !== "full_day" &&
-      startDate
-    ) {
-      setEndDate(startDate);
-    }
-
-    if (
-      leaveType === "comp_day" &&
-      startDate
-    ) {
-      setEndDate(startDate);
-    }
-  }
+}
 
   return (
     <div className="grid-2">
@@ -414,13 +398,15 @@ export function RequestForm({
 
             {leaveType ===
               "comp_day" && (
-              <p className="tiny">
-                Compensatory Leave can
-                be used as a Full Day
-                or Half Day and can
-                only be used on an
-                eligible WFH day.
-              </p>
+<p className="tiny">
+  Full Day Compensatory
+  Leave can span multiple
+  dates. Only eligible WFH
+  days in the selected
+  range will use your Comp
+  Day balance. Half Day
+  remains single-date.
+</p>
             )}
 
             {isHalfDay && (
@@ -502,7 +488,9 @@ export function RequestForm({
                     : `${calc.leaveDays} day(s) will be deducted`
                   : leaveType ===
                       "comp_day"
-                    ? "Pick a WFH date to continue"
+                    ? isHalfDay
+  ? "Pick an eligible WFH date to continue"
+  : "Pick your dates to see the Comp Day calculation"
                     : isHalfDay
                       ? "Pick a date to continue"
                       : "Pick your dates to see the calculation"}
@@ -542,22 +530,26 @@ export function RequestForm({
             {leaveType ===
             "comp_day" ? (
               <div className="stack">
-                <p className="muted-sm">
-                  Compensatory Leave
-                  can only be used on
-                  an eligible{" "}
-                  <b>WFH day</b>.
-                </p>
+         <p className="muted-sm">
+  Full Day Compensatory
+  Leave can cover a date
+  range. Only eligible{" "}
+  <b>WFH days</b> within
+  the range use your Comp
+  Day balance.
+</p>
 
-                <p className="tiny">
-                  A Full Day uses 1
-                  Comp Day. A Half Day
-                  uses 0.5 Comp Day.
-                  Office days,
-                  weekends, and
-                  company holidays
-                  cannot be selected.
-                </p>
+<p className="tiny">
+  Each eligible WFH day
+  uses 1 Comp Day. A Half
+  Day uses 0.5 Comp Day
+  and must be for a single
+  eligible WFH date.
+  Office days, weekends,
+  and company holidays
+  within a Full Day range
+  are skipped.
+</p>
 
                 {calc && (
                   <div className="breakdown">
