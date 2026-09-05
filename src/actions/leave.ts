@@ -156,14 +156,117 @@ export async function submitLeaveAction(
       day: "2-digit",
     }).format(earliestStart);
 
-  if (startDate < earliestStartDate) {
+if (startDate < earliestStartDate) {
+  return {
+    ok: false,
+    message:
+      "Leave must be requested at least 7 days in advance. For emergency leave, please contact an admin.",
+    field: "startDate",
+  };
+}
+
+/*
+ * Compensatory Leave:
+ * The selected Start / End dates themselves
+ * must be eligible WFH dates.
+ *
+ * Office days, weekends, and holidays may
+ * still exist inside a Full Day range and
+ * will be skipped from the Comp Day deduction.
+ */
+if (leaveType === "comp_day") {
+  try {
+    const endpointEligibility = await withUser(
+      me.id,
+      async (db) => {
+        const { rows } = await db.query<{
+          start_mode: "office" | "wfh";
+          start_is_weekend: boolean;
+          start_is_holiday: boolean;
+          end_mode: "office" | "wfh";
+          end_is_weekend: boolean;
+          end_is_holiday: boolean;
+        }>(
+          `
+            select
+              app.effective_work_mode(
+                $1::date
+              ) as start_mode,
+
+              extract(
+                isodow from $1::date
+              ) in (6, 7) as start_is_weekend,
+
+              exists (
+                select 1
+                from public.holidays h
+                where h.holiday_date = $1::date
+                  and h.active
+              ) as start_is_holiday,
+
+              app.effective_work_mode(
+                $2::date
+              ) as end_mode,
+
+              extract(
+                isodow from $2::date
+              ) in (6, 7) as end_is_weekend,
+
+              exists (
+                select 1
+                from public.holidays h
+                where h.holiday_date = $2::date
+                  and h.active
+              ) as end_is_holiday
+          `,
+          [startDate, endDate],
+        );
+
+        return rows[0];
+      },
+    );
+
+    if (
+      endpointEligibility.start_is_weekend ||
+      endpointEligibility.start_is_holiday ||
+      endpointEligibility.start_mode !== "wfh"
+    ) {
+      return {
+        ok: false,
+        message:
+          leaveSession === "full_day"
+            ? "Start date must be an eligible WFH day."
+            : "Selected date must be an eligible WFH day.",
+        field: "startDate",
+      };
+    }
+
+    if (
+      leaveSession === "full_day" &&
+      startDate !== endDate &&
+      (
+        endpointEligibility.end_is_weekend ||
+        endpointEligibility.end_is_holiday ||
+        endpointEligibility.end_mode !== "wfh"
+      )
+    ) {
+      return {
+        ok: false,
+        message:
+          "End date must be an eligible WFH day.",
+        field: "endDate",
+      };
+    }
+  } catch (e) {
+    const f = toFriendlyError(e);
+
     return {
       ok: false,
-      message:
-        "Leave must be requested at least 7 days in advance. For emergency leave, please contact an admin.",
-      field: "startDate",
+      message: f.message,
+      field: f.field,
     };
   }
+}
 
 let requestId: string;
 
@@ -427,43 +530,76 @@ if (leaveType === "comp_day") {
     });
 
     const leaveDays = isHalfDay
-      ? 0.5
-      : days.filter(
-          (day) => day.deducted,
-        ).length;
+  ? 0.5
+  : days.filter(
+      (day) => day.deducted,
+    ).length;
 
-    /*
-     * Half Day still has to be an eligible
-     * WFH date. Since Half Day is always
-     * single-date, rows[0] is authoritative.
-     */
-    if (isHalfDay) {
-      const day = rows[0];
+const eligibilityError = (
+  row:
+    | (typeof rows)[number]
+    | undefined,
+  label: string,
+) => {
+  if (!row) {
+    return `${label} could not be checked.`;
+  }
 
-      if (day?.is_weekend) {
-        return {
-          ok: false,
-          message:
-            "Compensatory Leave cannot be used on weekends.",
-        };
-      }
+  if (row.is_weekend) {
+    return `${label} must be an eligible WFH day. Weekends cannot be selected for Compensatory Leave.`;
+  }
 
-      if (day?.holiday_name) {
-        return {
-          ok: false,
-          message:
-            "Compensatory Leave cannot be used on company holidays.",
-        };
-      }
+  if (row.holiday_name) {
+    return `${label} must be an eligible WFH day. Company holidays cannot be selected for Compensatory Leave.`;
+  }
 
-      if (day?.mode !== "wfh") {
-        return {
-          ok: false,
-          message:
-            "Compensatory Leave can only be used on WFH days.",
-        };
-      }
-    }
+  if (row.mode !== "wfh") {
+    return `${label} must be an eligible WFH day. Office days cannot be selected for Compensatory Leave.`;
+  }
+
+  return null;
+};
+
+/*
+ * Comp Day endpoints must themselves be
+ * eligible WFH dates.
+ *
+ * Office days, weekends, and holidays may
+ * still exist inside a Full Day range and
+ * are skipped from the Comp Day deduction.
+ */
+const startEligibilityError =
+  eligibilityError(
+    rows[0],
+    isHalfDay
+      ? "Selected date"
+      : "Start date",
+  );
+
+if (startEligibilityError) {
+  return {
+    ok: false,
+    message: startEligibilityError,
+  };
+}
+
+if (
+  !isHalfDay &&
+  startDate !== endDate
+) {
+  const endEligibilityError =
+    eligibilityError(
+      rows[rows.length - 1],
+      "End date",
+    );
+
+  if (endEligibilityError) {
+    return {
+      ok: false,
+      message: endEligibilityError,
+    };
+  }
+}
 
     if (leaveDays === 0) {
       return {
