@@ -22,7 +22,8 @@ export default async function AdminRequestsPage({
   }>;
 }) {
   const me = await requireAdmin();
-const sp = await searchParams;
+  const today = companyToday();
+  const sp = await searchParams;
 
 const requestId =
   sp.request &&
@@ -45,7 +46,7 @@ const employeeId =
 
   const [requests, employees] = await Promise.all([
     getAllRequests(me.id, { status, employeeId }),
-    getEmployeeOverview(me.id, Number(companyToday().slice(0, 4))),
+    getEmployeeOverview(me.id, Number(today.slice(0, 4))),
   ]);
 
   const link = (s: string) =>
@@ -154,17 +155,20 @@ const employeeId =
                       <td data-label="Days" className="r num">{r.leaveDays}</td>
                       <td data-label="Status"><StatusBadge status={r.status} /></td>
                       <td data-label="Submitted" className="muted-sm nowrap">{formatDate(r.createdAt.slice(0, 10))}</td>
-                      <td data-label="Action" className="r">
-                        {r.status === "pending" ? (
-  <AdminDecision request={r} />
-) : r.status === "approved" ? (
-  <AdminCancelLeave request={r} />
-) : (
-  <span className="tiny">
-    {r.approvedByName ? `by ${r.approvedByName}` : "—"}
-  </span>
-)}
-                      </td>
+<td data-label="Action" className="r">
+  {r.status === "pending" ? (
+    <AdminDecision request={r} />
+  ) : r.status === "approved" &&
+    r.endDate >= today ? (
+    <AdminCancelLeave request={r} />
+  ) : (
+    <span className="tiny">
+      {r.approvedByName
+        ? `by ${r.approvedByName}`
+        : "—"}
+    </span>
+  )}
+</td>
                     </tr>
                   ))}
                 </tbody>

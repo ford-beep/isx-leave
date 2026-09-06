@@ -471,8 +471,8 @@ export async function getAllRequests(
     me,
     `select ${REQUEST_COLUMNS} ${REQUEST_FROM}
      ${where.length ? "where " + where.join(" and ") : ""}
-      order by case when lr.status = 'pending' then 0 else 1 end, lr.start_date desc
-      limit 300`,
+      order by lr.created_at desc, lr.id desc
+limit 300`,
     params,
   );
   return rows.map(mapRequest);
