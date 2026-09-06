@@ -74,13 +74,13 @@ export function LeaveTable({
         <tbody>
           {requests.map((r) => {
             const canSelfCancel =
-              allowSelfCancel &&
-              Boolean(today) &&
-              (r.leaveType === "annual" ||
-                r.leaveType === "comp_day") &&
-              (r.status === "pending" ||
-                r.status === "approved") &&
-              today! < r.startDate;
+  allowSelfCancel &&
+  Boolean(today) &&
+  (r.leaveType === "annual" ||
+    r.leaveType === "comp_day") &&
+  (r.status === "pending" ||
+    r.status === "approved") &&
+  today! <= r.endDate;
 
             return (
 <tr

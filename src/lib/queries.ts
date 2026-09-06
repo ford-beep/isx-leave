@@ -304,9 +304,9 @@ export async function getMyRequests(
   const rows = await queryAs<Record<string, any>>(
     me,
     `select ${REQUEST_COLUMNS} ${REQUEST_FROM}
-      where lr.employee_id = $1
-      order by lr.start_date desc
-      ${limit ? "limit " + Number(limit) : ""}`,
+  where lr.employee_id = $1
+  order by lr.created_at desc, lr.id desc
+  ${limit ? "limit " + Number(limit) : ""}`,
     [me],
   );
   return rows.map(mapRequest);
