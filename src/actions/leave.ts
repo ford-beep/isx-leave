@@ -268,61 +268,146 @@ if (leaveType === "comp_day") {
   }
 }
 
+type SubmittedCompDayAllocation = {
+  earnedDate: string;
+  note: string | null;
+  amount: number;
+};
+
 let requestId: string;
+let submittedCompDayAllocation: SubmittedCompDayAllocation[] =
+  [];
 
 try {
-  requestId = await withUser(me.id, async (db) => {
-    const result = await db.query<{ id: string }>(
-      `
-        insert into leave_requests (
-          employee_id,
-          leave_type,
-          start_date,
-          end_date,
-          leave_session,
-          reason
-        )
-        values (
-          $1,
-          $2,
-          $3::date,
-          $4::date,
-          $5::public.leave_session,
-          $6
-        )
-        returning id
-      `,
-      [
-        me.id,
-        leaveType,
-        startDate,
-        endDate,
-        leaveSession,
-        reason ?? null,
-      ],
-    );
+  const submitted = await withUser(
+    me.id,
+    async (db) => {
+      const result = await db.query<{
+        id: string;
+      }>(
+        `
+          insert into leave_requests (
+            employee_id,
+            leave_type,
+            start_date,
+            end_date,
+            leave_session,
+            reason
+          )
+          values (
+            $1,
+            $2,
+            $3::date,
+            $4::date,
+            $5::public.leave_session,
+            $6
+          )
+          returning id
+        `,
+        [
+          me.id,
+          leaveType,
+          startDate,
+          endDate,
+          leaveSession,
+          reason ?? null,
+        ],
+      );
 
-    return result.rows[0].id;
-  });
+      const id = result.rows[0].id;
+
+      let compDayAllocation: SubmittedCompDayAllocation[] =
+        [];
+
+      if (leaveType === "comp_day") {
+        await db.query(
+          `
+            select app.allocate_comp_day_fifo(
+              $1::uuid
+            )
+          `,
+          [id],
+        );
+
+        const allocationResult =
+          await db.query<SubmittedCompDayAllocation>(
+            `
+              select
+                c.earned_date::text as "earnedDate",
+                c.note,
+                u.amount::float8 as amount
+              from public.comp_day_usages u
+              join public.comp_day_credits c
+                on c.id = u.credit_id
+              where u.request_id = $1::uuid
+              order by
+                c.earned_date asc,
+                c.created_at asc,
+                c.id asc
+            `,
+            [id],
+          );
+
+        compDayAllocation =
+          allocationResult.rows;
+      }
+
+      return {
+        requestId: id,
+        compDayAllocation,
+      };
+    },
+  );
+
+  requestId = submitted.requestId;
+  submittedCompDayAllocation =
+    submitted.compDayAllocation;
 } catch (e) {
-    const f = toFriendlyError(e);
+  const f = toFriendlyError(e);
 
-    return {
-      ok: false,
-      message: f.message,
-      field: f.field,
-    };
-  }
+  return {
+    ok: false,
+    message: f.message,
+    field: f.field,
+  };
+}
 
-  try {
-    const adminEmails =
-      await getActiveAdminEmails(me.id);
+try {
+  const adminEmails =
+    await getActiveAdminEmails(me.id);
 
-    if (adminEmails.length > 0) {
+  if (adminEmails.length > 0) {
       const leaveTypeLabel =
         leaveType === "comp_day"
           ? "Compensatory Leave"
           : "Annual Leave";
+          const compDayAllocationHtml =
+  leaveType === "comp_day" &&
+  submittedCompDayAllocation.length > 0
+    ? `
+      <p>
+        <strong>Comp Day allocation:</strong>
+      </p>
+
+      <ul>
+        ${submittedCompDayAllocation
+          .map(
+            (allocation) => `
+              <li>
+                Earned from ${allocation.earnedDate}
+                — ${allocation.amount} day
+                ${
+                  allocation.note
+                    ? `<br />Note: ${allocation.note}`
+                    : ""
+                }
+              </li>
+            `,
+          )
+          .join("")}
+      </ul>
+    `
+    : "";
 
       await sendEmail({
         to: adminEmails,
@@ -351,6 +436,8 @@ try {
             <strong>Reason:</strong>
             ${reason ?? "—"}
           </p>
+
+          ${compDayAllocationHtml}
 
           <p>
             Please sign in to ISX Leave to review
@@ -382,6 +469,13 @@ try {
   };
 }
 
+type CompDayAllocationPreview = {
+  creditId: string;
+  earnedDate: string;
+  note: string | null;
+  amount: number;
+  remainingAfter: number;
+};
 /**
  * Live breakdown for the request form.
  *
@@ -397,6 +491,7 @@ export async function previewLeaveAction(
   | {
       ok: true;
       calc: LeaveCalculation;
+      compDayAllocation?: CompDayAllocationPreview[];
     }
   | {
       ok: false;
@@ -609,6 +704,123 @@ if (
       };
     }
 
+    /*
+     * Preview the exact Comp Day credits that FIFO
+     * would use if the request were submitted now.
+     *
+     * This mirrors app.allocate_comp_day_fifo():
+     * - same employee
+     * - same year
+     * - earned on/before leave start date
+     * - oldest credit first
+     * - pending + approved usage reserves balance
+     */
+    const compDayAllocation =
+      await withUser(me.id, async (db) => {
+        const creditResult =
+          await db.query<{
+            id: string;
+            earned_date: string;
+            note: string | null;
+            active_used: string | number;
+          }>(
+            `
+              select
+                c.id,
+                c.earned_date::text
+                  as earned_date,
+                c.note,
+
+                coalesce(
+                  sum(cu.amount) filter (
+                    where lr.status in (
+                      'pending',
+                      'approved'
+                    )
+                  ),
+                  0
+                )::numeric as active_used
+
+              from public.comp_day_credits c
+
+              left join public.comp_day_usages cu
+                on cu.credit_id = c.id
+
+              left join public.leave_requests lr
+                on lr.id = cu.request_id
+
+              where c.employee_id = $1
+                and c.earned_year =
+                  extract(
+                    year from $2::date
+                  )::int
+                and c.earned_date <= $2::date
+
+              group by
+                c.id,
+                c.earned_date,
+                c.note,
+                c.created_at
+
+              order by
+                c.earned_date asc,
+                c.created_at asc,
+                c.id asc
+            `,
+            [me.id, startDate],
+          );
+
+        let remainingNeeded = leaveDays;
+
+        const allocations:
+          CompDayAllocationPreview[] = [];
+
+        for (const credit of creditResult.rows) {
+          if (remainingNeeded <= 0) {
+            break;
+          }
+
+          const used = Number(
+            credit.active_used ?? 0,
+          );
+
+          const available = Math.max(
+            0,
+            1 - used,
+          );
+
+          if (available <= 0) {
+            continue;
+          }
+
+          const amount = Math.min(
+            available,
+            remainingNeeded,
+          );
+
+          allocations.push({
+            creditId: credit.id,
+            earnedDate:
+              credit.earned_date,
+            note: credit.note,
+            amount,
+            remainingAfter:
+              available - amount,
+          });
+
+          remainingNeeded -= amount;
+        }
+
+        if (remainingNeeded > 0.0001) {
+          throw new Error(
+            "COMP_DAY_FIFO_INSUFFICIENT_EARNED_BALANCE",
+          );
+        }
+
+        return allocations;
+      });
+
+
     const holidays = rows
       .filter(
         (row) =>
@@ -625,34 +837,36 @@ if (
           row.mode === "office",
       }));
 
-    return {
-      ok: true,
-      calc: {
-        startDate,
-        endDate,
-        totalCalendarDays: rows.length,
+return {
+  ok: true,
+  calc: {
+    startDate,
+    endDate,
+    totalCalendarDays: rows.length,
 
-        officeDaysInRange:
-          rows.filter(
-            (row) =>
-              row.mode === "office",
-          ).length,
+    officeDaysInRange:
+      rows.filter(
+        (row) =>
+          row.mode === "office",
+      ).length,
 
-        excludedNonOfficeDays:
-          days.filter(
-            (day) =>
-              !day.deducted &&
-              !day.holiday,
-          ).length,
+    excludedNonOfficeDays:
+      days.filter(
+        (day) =>
+          !day.deducted &&
+          !day.holiday,
+      ).length,
 
-        excludedHolidays:
-          holidays.length,
+    excludedHolidays:
+      holidays.length,
 
-        leaveDays,
-        holidays,
-        days,
-      },
-    };
+    leaveDays,
+    holidays,
+    days,
+  },
+
+  compDayAllocation,
+};
   } catch (e) {
     return {
       ok: false,

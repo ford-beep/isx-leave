@@ -95,6 +95,14 @@ export interface CompDayBalance {
   available: number;
 }
 
+export interface CompDayCreditUsage {
+  requestId: string;
+  leaveDate: ISODate;
+  leaveSession: "full_day" | "morning" | "afternoon";
+  amount: number;
+  status: LeaveStatus;
+}
+
 export interface CompDayCredit {
   id: string;
   employeeId: string;
@@ -103,6 +111,12 @@ export interface CompDayCredit {
   createdBy: string;
   createdByName: string | null;
   createdAt: string;
+
+  reservedAmount: number;
+  usedAmount: number;
+  availableAmount: number;
+
+  usages: CompDayCreditUsage[];
 }
 
 export interface Holiday {

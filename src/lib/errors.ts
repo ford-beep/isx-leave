@@ -199,6 +199,15 @@ const MAP: Array<
   ],
 
   [
+  /COMP_DAY_FIFO_INSUFFICIENT_EARNED_BALANCE/,
+  () => ({
+    message:
+      "You don't have enough earned Comp Days available for these dates.",
+    field: "endDate",
+  }),
+],
+
+  [
     /COMP_DAY_INSUFFICIENT_BALANCE/,
     () => ({
       message:

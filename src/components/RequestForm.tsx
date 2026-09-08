@@ -36,6 +36,15 @@ type LeaveSession =
   | "morning"
   | "afternoon";
 
+type CompDayAllocationPreview = {
+  creditId: string;
+  earnedDate: string;
+  note: string | null;
+  amount: number;
+  remainingAfter: number;
+};
+
+
 export function RequestForm({
   balance,
   compDayBalance,
@@ -74,6 +83,9 @@ export function RequestForm({
       null,
     );
 
+  const [compDayAllocation, setCompDayAllocation] =
+  useState<CompDayAllocationPreview[]>([]);
+
   const [calcError, setCalcError] =
     useState<string | null>(null);
 
@@ -104,14 +116,15 @@ export function RequestForm({
     ).format(d);
   })();
 
-  useEffect(() => {
-    if (!startDate || !endDate) {
-      setCalc(null);
-      setCalcError(null);
-      return;
-    }
+useEffect(() => {
+  if (!startDate || !endDate) {
+    setCalc(null);
+    setCompDayAllocation([]);
+    setCalcError(null);
+    return;
+  }
 
-    startCalc(async () => {
+  startCalc(async () => {
       const res =
         await previewLeaveAction(
           leaveType,
@@ -120,15 +133,17 @@ export function RequestForm({
           endDate,
         );
 
-      if (res.ok) {
-        setCalc(res.calc);
-        setCalcError(null);
-      } else {
-        setCalc(null);
-        setCalcError(
-          res.message,
-        );
-      }
+if (res.ok) {
+  setCalc(res.calc);
+  setCompDayAllocation(
+    res.compDayAllocation ?? [],
+  );
+  setCalcError(null);
+} else {
+  setCalc(null);
+  setCompDayAllocation([]);
+  setCalcError(res.message);
+}
     });
   }, [
     leaveType,
@@ -165,6 +180,7 @@ function changeLeaveType(
 ) {
   setLeaveType(nextType);
   setCalc(null);
+  setCompDayAllocation([]);
   setCalcError(null);
 }
 
@@ -173,6 +189,7 @@ function changeSession(
 ) {
   setLeaveSession(nextSession);
   setCalc(null);
+  setCompDayAllocation([]);
   setCalcError(null);
 
   if (
@@ -552,48 +569,124 @@ function changeSession(
 </p>
 
                 {calc && (
-                  <div className="breakdown">
-                    <div className="breakdown-row">
-                      <span className="lbl">
-                        Selected date
-                      </span>
+  <>
+    <div className="breakdown">
+      <div className="breakdown-row">
+        <span className="lbl">
+          Selected date
+        </span>
 
-                      <span className="val">
-                        {formatDate(
-                          calc.startDate,
-                        )}
-                      </span>
-                    </div>
+        <span className="val">
+          {formatDate(
+            calc.startDate,
+          )}
+        </span>
+      </div>
 
-                    <div className="breakdown-row">
-                      <span className="lbl">
-                        Duration
-                      </span>
+      <div className="breakdown-row">
+        <span className="lbl">
+          Duration
+        </span>
 
-                      <span className="val">
-                        {leaveSession ===
-                        "morning"
-                          ? "Half Day — Morning"
-                          : leaveSession ===
-                              "afternoon"
-                            ? "Half Day — Afternoon"
-                            : "Full Day"}
-                      </span>
-                    </div>
+        <span className="val">
+          {leaveSession === "morning"
+            ? "Half Day — Morning"
+            : leaveSession === "afternoon"
+              ? "Half Day — Afternoon"
+              : "Full Day"}
+        </span>
+      </div>
 
-                    <div className="breakdown-row total">
-                      <span className="lbl">
-                        Comp Day used
-                      </span>
+      <div className="breakdown-row total">
+        <span className="lbl">
+          Comp Day used
+        </span>
 
-                      <span className="val">
-                        {
-                          calc.leaveDays
-                        }
-                      </span>
-                    </div>
+        <span className="val">
+          {calc.leaveDays}
+        </span>
+      </div>
+    </div>
+
+    {compDayAllocation.length > 0 && (
+      <div
+        style={{
+          marginTop: 16,
+          paddingTop: 16,
+          borderTop:
+            "1px solid var(--border)",
+        }}
+      >
+        <div
+          className="tiny"
+          style={{
+            fontWeight: 650,
+            marginBottom: 8,
+          }}
+        >
+          Comp Day allocation
+        </div>
+
+        <div
+          className="stack"
+          style={{ gap: 8 }}
+        >
+          {compDayAllocation.map(
+            (allocation) => (
+              <div
+                key={allocation.creditId}
+                className="breakdown"
+              >
+                <div className="breakdown-row">
+                  <span className="lbl">
+                    Earned from
+                  </span>
+
+                  <span className="val">
+                    {formatDate(
+                      allocation.earnedDate,
+                    )}
+                  </span>
+                </div>
+
+                <div className="breakdown-row">
+                  <span className="lbl">
+                    Using
+                  </span>
+
+                  <span className="val">
+                    {allocation.amount} day
+                  </span>
+                </div>
+
+                <div className="breakdown-row">
+                  <span className="lbl">
+                    Remaining after request
+                  </span>
+
+                  <span className="val">
+                    {allocation.remainingAfter} day
+                  </span>
+                </div>
+
+                {allocation.note && (
+                  <div
+                    className="tiny"
+                    style={{
+                      marginTop: 8,
+                    }}
+                  >
+                    {allocation.note}
                   </div>
                 )}
+              </div>
+            ),
+          )}
+        </div>
+      </div>
+    )}
+  </>
+)}
               </div>
             ) : calc &&
               isHalfDay ? (

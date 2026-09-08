@@ -270,13 +270,77 @@ export async function getCompDayCredits(
         c.note,
         c.created_by,
         creator.name as created_by_name,
-        c.created_at
+        c.created_at,
+
+        coalesce(
+          sum(cu.amount) filter (
+            where lr.status = 'pending'
+          ),
+          0
+        )::numeric as reserved_amount,
+
+        coalesce(
+          sum(cu.amount) filter (
+            where lr.status = 'approved'
+          ),
+          0
+        )::numeric as used_amount,
+
+        (
+          1 -
+          coalesce(
+            sum(cu.amount) filter (
+              where lr.status in ('pending', 'approved')
+            ),
+            0
+          )
+        )::numeric as available_amount,
+
+        coalesce(
+          jsonb_agg(
+            jsonb_build_object(
+              'requestId', lr.id,
+              'leaveDate', lr.start_date::text,
+              'leaveSession', lr.leave_session::text,
+              'amount', cu.amount,
+              'status', lr.status::text
+            )
+            order by
+              lr.start_date asc,
+              lr.created_at asc
+          ) filter (
+            where cu.id is not null
+              and lr.status in ('pending', 'approved')
+          ),
+          '[]'::jsonb
+        ) as usages
+
       from comp_day_credits c
+
       left join users creator
         on creator.id = c.created_by
+
+      left join comp_day_usages cu
+        on cu.credit_id = c.id
+
+      left join leave_requests lr
+        on lr.id = cu.request_id
+
       where c.employee_id = $1
         and c.earned_year = $2
-      order by c.earned_date desc, c.created_at desc
+
+      group by
+        c.id,
+        c.employee_id,
+        c.earned_date,
+        c.note,
+        c.created_by,
+        creator.name,
+        c.created_at
+
+      order by
+        c.earned_date desc,
+        c.created_at desc
     `,
     [employeeId, year],
   );
@@ -292,6 +356,20 @@ export async function getCompDayCredits(
       r.created_at instanceof Date
         ? r.created_at.toISOString()
         : String(r.created_at),
+
+    reservedAmount: Number(r.reserved_amount ?? 0),
+    usedAmount: Number(r.used_amount ?? 0),
+    availableAmount: Number(r.available_amount ?? 0),
+
+    usages: Array.isArray(r.usages)
+      ? r.usages.map((usage: Record<string, any>) => ({
+          requestId: String(usage.requestId),
+          leaveDate: String(usage.leaveDate),
+          leaveSession: usage.leaveSession,
+          amount: Number(usage.amount ?? 0),
+          status: usage.status,
+        }))
+      : [],
   }));
 }
 

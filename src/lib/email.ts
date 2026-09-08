@@ -32,33 +32,66 @@ export async function sendEmail({
   html: string;
 }) {
   if (!emailEnabled) {
-    console.log("[email] Email notifications are disabled.");
+    console.log(
+      "[email] Email notifications are disabled.",
+    );
     return;
   }
 
   if (!smtpHost || !smtpUser || !smtpPass) {
-    throw new Error("SMTP email configuration is incomplete.");
+    throw new Error(
+      "SMTP email configuration is incomplete.",
+    );
   }
 
   const isProduction =
     process.env.NODE_ENV === "production";
 
-  const actualTo =
-    !isProduction && emailTestRecipient
-      ? emailTestRecipient
-      : Array.isArray(to)
-        ? to.join(", ")
-        : to;
+  /*
+   * Safety rule:
+   *
+   * Production:
+   *   Send to the real recipient.
+   *
+   * Development / localhost:
+   *   Never send to the real recipient.
+   *   Redirect only when EMAIL_TEST_RECIPIENT
+   *   has been explicitly configured.
+   */
+  if (!isProduction) {
+    if (!emailTestRecipient) {
+      console.log(
+        "[email] Development mode: email skipped because EMAIL_TEST_RECIPIENT is not configured.",
+      );
 
-  if (!isProduction && emailTestRecipient) {
+      console.log(
+        `[email] Original recipient was: ${
+          Array.isArray(to)
+            ? to.join(", ")
+            : to
+        }`,
+      );
+
+      return;
+    }
+
     console.log(
-      `[email] Test mode: redirecting email to ${emailTestRecipient}`,
+      `[email] Development mode: redirecting email to ${emailTestRecipient}`,
     );
+
+    return transporter.sendMail({
+      from: `ISX Leave <${smtpUser}>`,
+      to: emailTestRecipient,
+      subject: `[TEST] ${subject}`,
+      html,
+    });
   }
 
   return transporter.sendMail({
     from: `ISX Leave <${smtpUser}>`,
-    to: actualTo,
+    to: Array.isArray(to)
+      ? to.join(", ")
+      : to,
     subject,
     html,
   });
