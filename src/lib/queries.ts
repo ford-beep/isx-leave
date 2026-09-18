@@ -23,6 +23,7 @@ import type {
   OfficeDayConfig,
   UserRow,
   WorkScheduleDay,
+  WeeklyPlanItem,
 } from "./types";
 import type { LeaveCalculation } from "./types";
 
@@ -430,9 +431,7 @@ export async function getRequestsInMonth(
   return rows.map(mapRequest);
 }
 
-export async function getActiveAdminEmails(
-  me: string,
-): Promise<string[]> {
+export async function getActiveAdminEmails(me: string): Promise<string[]> {
   const testRecipient =
     process.env.NODE_ENV !== "production"
       ? process.env.EMAIL_TEST_RECIPIENT?.trim()
@@ -449,14 +448,10 @@ export async function getActiveAdminEmails(
 
   return rows
     .map((row) => row.email)
-    .filter(
-      (email) => !email.endsWith("@demo.isx.local"),
-    );
+    .filter((email) => !email.endsWith("@demo.isx.local"));
 }
 
-export async function getActiveCompanyEmails(
-  me: string,
-): Promise<string[]> {
+export async function getActiveCompanyEmails(me: string): Promise<string[]> {
   const testRecipient =
     process.env.NODE_ENV !== "production"
       ? process.env.EMAIL_TEST_RECIPIENT?.trim()
@@ -476,9 +471,7 @@ export async function getActiveCompanyEmails(
 
   return rows
     .map((row) => row.email)
-    .filter(
-      (email) => !email.endsWith("@demo.isx.local"),
-    );
+    .filter((email) => !email.endsWith("@demo.isx.local"));
 }
 
 export interface CompanyCalendarLeave {
@@ -646,23 +639,21 @@ export async function getEmployeeOverview(
   order by u.active desc, u.name`,
     [year],
   );
-return rows.map((r) => ({
-  id: r.id,
-  name: r.name,
-  email: r.email,
-  role: r.role,
-  active: r.active,
-  jobTitle: r.job_title,
-  birthday: r.birthday ?? null,
-  createdAt: r.created_at,
-  entitlement: Number(r.entitlement),
-  used: Number(r.approved),
-  pending: Number(r.pending),
-  remaining: Number(r.remaining),
-  sickLeaveUsed: Number(
-    r.sick_leave_used ?? 0,
-  ),
-}));
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    email: r.email,
+    role: r.role,
+    active: r.active,
+    jobTitle: r.job_title,
+    birthday: r.birthday ?? null,
+    createdAt: r.created_at,
+    entitlement: Number(r.entitlement),
+    used: Number(r.approved),
+    pending: Number(r.pending),
+    remaining: Number(r.remaining),
+    sickLeaveUsed: Number(r.sick_leave_used ?? 0),
+  }));
 }
 
 export interface CalendarBirthday {
@@ -844,4 +835,162 @@ export async function getSetting(me: string, key: string): Promise<unknown> {
     [key],
   );
   return r?.value;
+}
+
+/* ---------------------------------------------------------- Weekly Plan */
+
+export async function getMyWeeklyPlan(
+  me: string,
+  weekStart: string,
+): Promise<WeeklyPlanItem[]> {
+  const rows = await queryAs<{
+    id: string;
+    employee_id: string;
+    week_start: string;
+    work_date: string;
+    category: "priority" | "other";
+    content: string;
+    sort_order: number;
+    created_at: Date | string;
+    updated_at: Date | string;
+  }>(
+    me,
+    `
+      select
+        id,
+        employee_id,
+        week_start::text as week_start,
+        work_date::text as work_date,
+        category,
+        content,
+        sort_order,
+        created_at,
+        updated_at
+      from weekly_plan_items
+      where employee_id = $1
+        and week_start = $2::date
+      order by work_date, category, sort_order, created_at
+    `,
+    [me, weekStart],
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    employeeId: row.employee_id,
+    weekStart: row.week_start,
+    workDate: row.work_date,
+    category: row.category,
+    content: row.content,
+    sortOrder: row.sort_order,
+    createdAt:
+      row.created_at instanceof Date
+        ? row.created_at.toISOString()
+        : String(row.created_at),
+    updatedAt:
+      row.updated_at instanceof Date
+        ? row.updated_at.toISOString()
+        : String(row.updated_at),
+  }));
+}
+
+export interface WeeklyPlanEmployee {
+  id: string;
+  name: string;
+  email: string;
+  role: "employee" | "admin";
+  active: boolean;
+  jobTitle: string | null;
+}
+
+export async function getWeeklyPlanEmployees(
+  me: string,
+): Promise<WeeklyPlanEmployee[]> {
+  const rows = await queryAs<{
+    id: string;
+    name: string;
+    email: string;
+    role: "employee" | "admin";
+    active: boolean;
+    job_title: string | null;
+  }>(
+    me,
+    `
+      select
+        id,
+        name,
+        email,
+        role,
+        active,
+        job_title
+      from users
+      where active = true
+      order by
+        case when role = 'employee' then 0 else 1 end,
+        name
+    `,
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    role: row.role,
+    active: row.active,
+    jobTitle: row.job_title,
+  }));
+}
+
+export async function getTeamWeeklyPlan(
+  me: string,
+  weekStart: string,
+  employeeId: string,
+): Promise<WeeklyPlanItem[]> {
+  const rows = await queryAs<{
+    id: string;
+    employee_id: string;
+    week_start: string;
+    work_date: string;
+    category: "priority" | "other";
+    content: string;
+    sort_order: number;
+    created_at: Date | string;
+    updated_at: Date | string;
+  }>(
+    me,
+    `
+      select
+        id,
+        employee_id,
+        week_start::text as week_start,
+        work_date::text as work_date,
+        category,
+        content,
+        sort_order,
+        created_at,
+        updated_at
+      from weekly_plan_items
+      where employee_id = $1
+        and week_start = $2::date
+      order by work_date, category, sort_order, created_at
+    `,
+    [employeeId, weekStart],
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    employeeId: row.employee_id,
+    weekStart: row.week_start,
+    workDate: row.work_date,
+    category: row.category,
+    content: row.content,
+    sortOrder: row.sort_order,
+    createdAt:
+      row.created_at instanceof Date
+        ? row.created_at.toISOString()
+        : String(row.created_at),
+    updatedAt:
+      row.updated_at instanceof Date
+        ? row.updated_at.toISOString()
+        : String(row.updated_at),
+  }));
 }

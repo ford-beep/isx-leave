@@ -43,10 +43,7 @@ export function MobileMenu({
       </button>
 
       {open && (
-        <div
-          className="mobile-menu-backdrop"
-          onClick={() => setOpen(false)}
-        >
+        <div className="mobile-menu-backdrop" onClick={() => setOpen(false)}>
           <aside
             className="mobile-menu-panel"
             onClick={(e) => e.stopPropagation()}
@@ -71,45 +68,30 @@ export function MobileMenu({
               </button>
             </div>
 
-            <nav
-              className="mobile-nav"
-              onClick={() => setOpen(false)}
-            >
+            <nav className="mobile-nav" onClick={() => setOpen(false)}>
               <div className="nav-label">My leave</div>
 
-              <NavLink
-                href="/dashboard"
-                icon={<IconHome size={16} />}
-                exact
-              >
+              <NavLink href="/dashboard" icon={<IconHome size={16} />} exact>
                 Dashboard
               </NavLink>
 
-              <NavLink
-                href="/my-leave"
-                icon={<IconList size={16} />}
-              >
+              <NavLink href="/my-leave" icon={<IconList size={16} />}>
                 My leave
               </NavLink>
 
-              <NavLink
-                href="/calendar"
-                icon={<IconCalendar size={16} />}
-              >
+              <NavLink href="/calendar" icon={<IconCalendar size={16} />}>
                 Calendar
               </NavLink>
 
-              <NavLink
-                href="/request"
-                icon={<IconPlus size={16} />}
-              >
+              <NavLink href="/weekly-plan" icon={<IconFile size={16} />}>
+                Weekly Plan
+              </NavLink>
+
+              <NavLink href="/request" icon={<IconPlus size={16} />}>
                 Request leave
               </NavLink>
 
-              <NavLink
-                href="/profile"
-                icon={<IconUser size={16} />}
-              >
+              <NavLink href="/profile" icon={<IconUser size={16} />}>
                 Profile
               </NavLink>
 
@@ -117,11 +99,7 @@ export function MobileMenu({
                 <>
                   <div className="nav-label">Administration</div>
 
-                  <NavLink
-                    href="/admin"
-                    icon={<IconShield size={16} />}
-                    exact
-                  >
+                  <NavLink href="/admin" icon={<IconShield size={16} />} exact>
                     Admin dashboard
                   </NavLink>
 
@@ -148,11 +126,18 @@ export function MobileMenu({
                   </NavLink>
 
                   <NavLink
-  href="/admin/comp-days"
-  icon={<IconPlus size={16} />}
->
-  Comp Days
-</NavLink>
+                    href="/admin/weekly-plans"
+                    icon={<IconFile size={16} />}
+                  >
+                    Weekly Plans
+                  </NavLink>
+
+                  <NavLink
+                    href="/admin/comp-days"
+                    icon={<IconPlus size={16} />}
+                  >
+                    Comp Days
+                  </NavLink>
 
                   <NavLink
                     href="/admin/settings"
@@ -161,10 +146,7 @@ export function MobileMenu({
                     Settings
                   </NavLink>
 
-                  <NavLink
-                    href="/admin/audit"
-                    icon={<IconFile size={16} />}
-                  >
+                  <NavLink href="/admin/audit" icon={<IconFile size={16} />}>
                     Audit log
                   </NavLink>
                 </>
@@ -181,10 +163,7 @@ export function MobileMenu({
                 </div>
               </div>
 
-              <form
-                action={logoutAction}
-                style={{ marginLeft: "auto" }}
-              >
+              <form action={logoutAction} style={{ marginLeft: "auto" }}>
                 <button
                   className="btn btn-ghost btn-sm"
                   type="submit"

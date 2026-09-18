@@ -60,11 +60,7 @@ export interface LeaveRequest {
   employeeEmail?: string;
   leaveType: string;
   leaveTypeLabel: string;
-  leaveSession:
-  | "full_day"
-  | "morning"
-  | "afternoon"
-  | "half_day";
+  leaveSession: "full_day" | "morning" | "afternoon" | "half_day";
   startDate: ISODate;
   endDate: ISODate;
   leaveDays: number;
@@ -160,4 +156,20 @@ export interface Notification {
   link: string | null;
   readAt: string | null;
   createdAt: string;
+}
+
+/* ---------------------------------------------------------- Weekly Plan */
+
+export type WeeklyPlanCategory = "priority" | "other";
+
+export interface WeeklyPlanItem {
+  id: string;
+  employeeId: string;
+  weekStart: ISODate;
+  workDate: ISODate;
+  category: WeeklyPlanCategory;
+  content: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
 }

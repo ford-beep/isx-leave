@@ -127,6 +127,24 @@ export default async function DashboardPage({
         />
       </div>
 
+      <Link href="/weekly-plan" className="dashboard-weekly-plan">
+        <div className="dashboard-weekly-plan-copy">
+          <div className="dashboard-weekly-plan-icon" aria-hidden="true">
+            <span>W</span>
+          </div>
+
+          <div>
+            <strong>Weekly Plan</strong>
+            <p>Plan and update your work for this week.</p>
+          </div>
+        </div>
+
+        <span className="dashboard-weekly-plan-action">
+          Open weekly plan
+          <span aria-hidden="true">→</span>
+        </span>
+      </Link>
+
       <div className="section grid-2">
         <Card>
           <CardHead
