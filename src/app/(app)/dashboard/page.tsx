@@ -1,11 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
-import {
-  companyToday,
-  formatRange,
-  relativeDayLabel,
-  WEEKDAY_NAMES,
-} from "@/lib/date";
+import { companyToday, formatRange, relativeDayLabel } from "@/lib/date";
+import { getDashboardQuote } from "@/lib/dashboardQuote";
 import {
   getBalance,
   getCalendarBirthdays,
@@ -51,31 +47,29 @@ export default async function DashboardPage({
   const calYear = Number(sp.y) || year;
   const calMonth = Number(sp.m) || Number(today.slice(5, 7));
 
-const [
-  balance,
-  sickLeaveUsed,
-  next,
-  recent,
-  office,
-  holidays,
-  companyLeaves,
-  workSchedule,
-  birthdays,
-] = await Promise.all([
-  getBalance(me.id, me.id, year),
-  getSickLeaveUsed(me.id, me.id, year),
-  getNextUpcomingLeave(me.id),
-  getMyRequests(me.id, 5),
-  getOfficeDays(me.id),
-  getHolidays(me.id, calYear),
-  getCompanyLeaveCalendar(me.id, calYear, calMonth),
-  getWorkSchedule(me.id, calYear, calMonth),
-  getCalendarBirthdays(me.id),
-]);
+  const [
+    balance,
+    sickLeaveUsed,
+    next,
+    recent,
+    office,
+    holidays,
+    companyLeaves,
+    workSchedule,
+    birthdays,
+  ] = await Promise.all([
+    getBalance(me.id, me.id, year),
+    getSickLeaveUsed(me.id, me.id, year),
+    getNextUpcomingLeave(me.id),
+    getMyRequests(me.id, 5),
+    getOfficeDays(me.id),
+    getHolidays(me.id, calYear),
+    getCompanyLeaveCalendar(me.id, calYear, calMonth),
+    getWorkSchedule(me.id, calYear, calMonth),
+    getCalendarBirthdays(me.id),
+  ]);
 
-  const officeNames =
-    office.weekdays.map((d) => WEEKDAY_NAMES[d]).join(" + ") ||
-    "not configured";
+  const dashboardQuote = getDashboardQuote(today);
 
   return (
     <>
@@ -85,10 +79,7 @@ const [
             {greeting()}, {me.name.split(" ")[0]}
           </h1>
 
-          <p className="muted">
-            ISX working days are <b>{officeNames}</b>. All working days count
-            against your leave, whether Office or WFH.
-          </p>
+          <p className="muted">{dashboardQuote}</p>
         </div>
 
         <Link href="/request" className="btn btn-primary">
@@ -128,22 +119,19 @@ const [
           sub={`${balance.available} available once pending is counted`}
         />
 
-         <Kpi
-  label="Sick leave"
-  value={sickLeaveUsed}
-  unit="days"
-  sub={`Used in ${year}`}
-/>
-
-
+        <Kpi
+          label="Sick leave"
+          value={sickLeaveUsed}
+          unit="days"
+          sub={`Used in ${year}`}
+        />
       </div>
 
       <div className="section grid-2">
         <Card>
           <CardHead
             title={
-              calMonth === Number(today.slice(5, 7)) &&
-              calYear === year
+              calMonth === Number(today.slice(5, 7)) && calYear === year
                 ? "This month"
                 : "Calendar"
             }
@@ -180,10 +168,7 @@ const [
                       letterSpacing: "-0.02em",
                     }}
                   >
-                    {formatRange(
-                      next.startDate,
-                      next.endDate,
-                    )}
+                    {formatRange(next.startDate, next.endDate)}
                   </div>
 
                   <div
@@ -193,13 +178,9 @@ const [
                       gap: 8,
                     }}
                   >
-                    <span className="badge badge-approved">
-                      Approved
-                    </span>
+                    <span className="badge badge-approved">Approved</span>
 
-                    <span className="chip">
-                      {next.leaveTypeLabel}
-                    </span>
+                    <span className="chip">{next.leaveTypeLabel}</span>
 
                     <span className="chip">
                       {next.leaveDays} day
@@ -208,18 +189,11 @@ const [
                   </div>
 
                   <p className="muted-sm mt-16">
-                    Starts{" "}
-                    {relativeDayLabel(
-                      next.startDate,
-                      today,
-                    )}
-                    .
+                    Starts {relativeDayLabel(next.startDate, today)}.
                   </p>
                 </>
               ) : (
-                <p className="muted-sm">
-                  No upcoming leave.
-                </p>
+                <p className="muted-sm">No upcoming leave.</p>
               )}
             </div>
           </Card>
@@ -231,10 +205,7 @@ const [
           <CardHead
             title="Recent leave requests"
             action={
-              <Link
-                href="/my-leave"
-                className="btn btn-sm"
-              >
+              <Link href="/my-leave" className="btn btn-sm">
                 View all
               </Link>
             }
@@ -244,10 +215,7 @@ const [
             <LeaveTable
               requests={recent}
               emptyAction={
-                <Link
-                  href="/request"
-                  className="btn btn-primary"
-                >
+                <Link href="/request" className="btn btn-primary">
                   <IconPlus size={16} />
                   Request leave
                 </Link>
