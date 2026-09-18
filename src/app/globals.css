@@ -764,7 +764,14 @@ table.tbl .actions { display: flex; gap: 6px; justify-content: flex-end; }
   gap: 16px;
   margin-bottom: 22px;
 }
+.weekly-plan-toolbar > .btn {
+  width: auto;
+  justify-self: start;
+}
 
+.weekly-plan-toolbar > .btn:last-child {
+  justify-self: end;
+}
 .weekly-plan-toolbar > :last-child {
   justify-self: end;
 }
