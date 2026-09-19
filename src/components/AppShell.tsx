@@ -3,6 +3,8 @@ import type { Notification, SessionUser } from "@/lib/types";
 import { NavLink } from "./NavLink";
 import { NotificationBell } from "./NotificationBell";
 import { PageTitle } from "./PageTitle";
+import { companyToday } from "@/lib/date";
+import { getDashboardSeason } from "@/lib/dashboardSeason";
 import { Avatar } from "./ui";
 import {
   IconCalendar,
@@ -33,6 +35,8 @@ export function AppShell({
   children: ReactNode;
 }) {
   const isAdmin = user.role === "admin";
+const dashboardSeason = getDashboardSeason(companyToday());
+const isChristmas = dashboardSeason === "christmas";
   return (
     <div className="shell">
       <aside className="sidebar">
@@ -110,7 +114,19 @@ export function AppShell({
 
         <div className="sidebar-foot">
           <div className="userbox">
-            <Avatar name={user.name} />
+            {isChristmas ? (
+  <div className="christmas-avatar">
+    <Avatar name={user.name} />
+    <img
+      src="/seasonal/christmas/santa-hat.svg"
+      alt=""
+      className="christmas-avatar-hat"
+      aria-hidden="true"
+    />
+  </div>
+) : (
+  <Avatar name={user.name} />
+)}
             <div className="userbox-meta">
               <div className="userbox-name">{user.name}</div>
               <div className="userbox-role">
@@ -146,7 +162,11 @@ export function AppShell({
 
           <NotificationBell notifications={notifications} unread={unread} />
 
-          <MobileMenu user={user} pendingCount={pendingCount} />
+          <MobileMenu
+  user={user}
+  pendingCount={pendingCount}
+  isChristmas={isChristmas}
+/>
         </header>
         <div className="content">{children}</div>
       </div>

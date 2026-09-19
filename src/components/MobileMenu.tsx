@@ -21,9 +21,11 @@ import {
 export function MobileMenu({
   user,
   pendingCount,
+  isChristmas,
 }: {
   user: SessionUser;
   pendingCount?: number;
+  isChristmas: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const isAdmin = user.role === "admin";
@@ -154,7 +156,19 @@ export function MobileMenu({
             </nav>
 
             <div className="mobile-menu-user">
-              <Avatar name={user.name} />
+{isChristmas ? (
+  <div className="christmas-avatar">
+    <Avatar name={user.name} />
+    <img
+      src="/seasonal/christmas/santa-hat.svg"
+      alt=""
+      className="christmas-avatar-hat"
+      aria-hidden="true"
+    />
+  </div>
+) : (
+  <Avatar name={user.name} />
+)}
 
               <div className="userbox-meta">
                 <div className="userbox-name">{user.name}</div>
