@@ -764,6 +764,7 @@ table.tbl .actions { display: flex; gap: 6px; justify-content: flex-end; }
   gap: 16px;
   margin-bottom: 22px;
 }
+
 .weekly-plan-toolbar > .btn {
   width: auto;
   justify-self: start;
@@ -772,6 +773,7 @@ table.tbl .actions { display: flex; gap: 6px; justify-content: flex-end; }
 .weekly-plan-toolbar > .btn:last-child {
   justify-self: end;
 }
+
 .weekly-plan-toolbar > :last-child {
   justify-self: end;
 }
@@ -786,8 +788,8 @@ table.tbl .actions { display: flex; gap: 6px; justify-content: flex-end; }
 }
 
 .weekly-plan-week-title > strong {
-  font-size: 15px;
   color: var(--c-ink);
+  font-size: 15px;
 }
 
 .weekly-plan-current {
@@ -822,7 +824,7 @@ table.tbl .actions { display: flex; gap: 6px; justify-content: flex-end; }
 }
 
 .weekly-plan-section {
-  overflow: hidden;
+  overflow-x: auto;
   border: 1px solid var(--c-border);
   border-radius: var(--r-lg);
   background: var(--c-surface);
@@ -850,11 +852,19 @@ table.tbl .actions { display: flex; gap: 6px; justify-content: flex-end; }
 }
 
 .weekly-plan-priority .weekly-plan-section-head {
-  background: color-mix(in srgb, var(--c-ok-soft) 70%, var(--c-surface));
+  background: color-mix(
+    in srgb,
+    var(--c-ok-soft) 70%,
+    var(--c-surface)
+  );
 }
 
 .weekly-plan-other .weekly-plan-section-head {
-  background: color-mix(in srgb, #fff4c2 45%, var(--c-surface));
+  background: color-mix(
+    in srgb,
+    #fff4c2 45%,
+    var(--c-surface)
+  );
 }
 
 .weekly-plan-grid {
@@ -863,22 +873,19 @@ table.tbl .actions { display: flex; gap: 6px; justify-content: flex-end; }
   min-width: 980px;
 }
 
-.weekly-plan-section {
-  overflow-x: auto;
-}
-
 .weekly-plan-day {
   min-width: 0;
   border-right: 1px solid var(--c-border);
+  background: var(--c-surface);
 }
 
 .weekly-plan-day:last-child {
   border-right: 0;
 }
 
-.weekly-plan-day.is-weekend {
-  background: var(--c-surface-sunk);
-}
+/* ------------------------------------------------------------
+   Weekly Plan — Day header
+   ------------------------------------------------------------ */
 
 .weekly-plan-day-head {
   display: flex;
@@ -889,10 +896,6 @@ table.tbl .actions { display: flex; gap: 6px; justify-content: flex-end; }
   padding: 9px 11px;
   border-bottom: 1px solid var(--c-border);
   background: var(--c-surface);
-}
-
-.weekly-plan-day.is-weekend .weekly-plan-day-head {
-  background: var(--c-surface-sunk);
 }
 
 .weekly-plan-day-head span {
@@ -907,6 +910,110 @@ table.tbl .actions { display: flex; gap: 6px; justify-content: flex-end; }
   color: var(--c-ink);
   font-size: 14px;
 }
+
+/* ------------------------------------------------------------
+   Weekly Plan — Weekend
+   ------------------------------------------------------------ */
+
+.weekly-plan-day.is-weekend {
+  background: color-mix(
+    in srgb,
+    var(--c-brand) 7%,
+    var(--c-surface)
+  );
+}
+
+.weekly-plan-day.is-weekend .weekly-plan-day-head {
+  background: color-mix(
+    in srgb,
+    var(--c-brand) 13%,
+    var(--c-surface)
+  );
+}
+
+.weekly-plan-day.is-weekend .weekly-plan-day-head span,
+.weekly-plan-day.is-weekend .weekly-plan-day-head strong {
+  color: var(--c-brand);
+}
+
+/* ------------------------------------------------------------
+   Weekly Plan — Leave / Holiday
+   ------------------------------------------------------------ */
+
+.weekly-plan-day-status {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 9px 0;
+}
+
+.weekly-plan-day-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.weekly-plan-day-note > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.weekly-plan-day-note-icon {
+  flex: 0 0 auto;
+}
+
+.weekly-plan-day-note.is-leave {
+  background: var(--c-info-soft);
+  border-color: var(--c-info-border);
+  color: var(--c-info);
+}
+
+.weekly-plan-day-note.is-holiday {
+  background: var(--c-warn-soft);
+  border-color: var(--c-warn-border);
+  color: var(--c-warn);
+}
+
+/* Slight visual cue across the full day */
+
+.weekly-plan-day.is-leave {
+  background: color-mix(
+    in srgb,
+    var(--c-info-soft) 42%,
+    var(--c-surface)
+  );
+}
+
+.weekly-plan-day.is-holiday {
+  background: color-mix(
+    in srgb,
+    var(--c-warn-soft) 55%,
+    var(--c-surface)
+  );
+}
+
+/*
+ * Weekend stays visually distinct even if other classes
+ * are ever added to the same cell.
+ */
+.weekly-plan-day.is-weekend {
+  background: color-mix(
+    in srgb,
+    var(--c-brand) 7%,
+    var(--c-surface)
+  );
+}
+
+/* ------------------------------------------------------------
+   Weekly Plan — Day body
+   ------------------------------------------------------------ */
 
 .weekly-plan-day-body {
   display: flex;
@@ -1052,7 +1159,31 @@ table.tbl .actions { display: flex; gap: 6px; justify-content: flex-end; }
 }
 
 /* ------------------------------------------------------------
-   Weekly Plan responsive
+   Weekly Plan — Tools
+   ------------------------------------------------------------ */
+
+.weekly-plan-tools {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  margin: -8px 0 14px;
+}
+
+.weekly-plan-copy {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.weekly-plan-copy-message {
+  color: var(--c-ink-3);
+  font-size: 12px;
+}
+
+/* ------------------------------------------------------------
+   Weekly Plan — Responsive
    ------------------------------------------------------------ */
 
 @media (max-width: 1080px) {
@@ -1113,62 +1244,7 @@ table.tbl .actions { display: flex; gap: 6px; justify-content: flex-end; }
   .weekly-plan-day-body {
     min-height: 160px;
   }
-}
 
-.weekly-plan-tools {
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  margin: -8px 0 14px;
-}
-
-.weekly-plan-copy {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.weekly-plan-copy-message {
-  color: var(--c-ink-3);
-  font-size: 12px;
-}
-
-@media (max-width: 640px) {
-  .weekly-plan-tools {
-    justify-content: stretch;
-  }
-
-  .weekly-plan-copy {
-    width: 100%;
-    justify-content: flex-start;
-  }
-}
-
-/* Weekly Plan tools */
-
-.weekly-plan-tools {
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  margin: -8px 0 14px;
-}
-
-.weekly-plan-copy {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.weekly-plan-copy-message {
-  color: var(--c-ink-3);
-  font-size: 12px;
-}
-
-@media (max-width: 640px) {
   .weekly-plan-tools {
     justify-content: stretch;
   }

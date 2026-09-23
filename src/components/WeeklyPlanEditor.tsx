@@ -16,6 +16,8 @@ type Day = {
   short: string;
   dayNumber: string;
   weekend: boolean;
+  holidayName: string | null;
+  leaveLabel: string | null;
 };
 
 type Props = {
@@ -232,14 +234,37 @@ function CategoryBoard({
 
           return (
             <div
-              className={`weekly-plan-day ${day.weekend ? "is-weekend" : ""}`}
-              key={`${category}-${day.date}`}
-            >
+  className={[
+    "weekly-plan-day",
+    day.weekend ? "is-weekend" : "",
+    day.leaveLabel ? "is-leave" : "",
+    day.holidayName ? "is-holiday" : "",
+  ]
+    .filter(Boolean)
+    .join(" ")}
+  key={`${category}-${day.date}`}
+>
               <div className="weekly-plan-day-head">
                 <span>{day.short}</span>
                 <strong>{day.dayNumber}</strong>
               </div>
+              {day.leaveLabel || day.holidayName ? (
+  <div className="weekly-plan-day-status">
+    {day.leaveLabel ? (
+      <div className="weekly-plan-day-note is-leave">
+        <span aria-hidden="true">🏖️</span>
+        <span>{day.leaveLabel}</span>
+      </div>
+    ) : null}
 
+    {day.holidayName ? (
+      <div className="weekly-plan-day-note is-holiday">
+        <span aria-hidden="true">🎉</span>
+        <span>{day.holidayName}</span>
+      </div>
+    ) : null}
+  </div>
+) : null}
               <div className="weekly-plan-day-body">
                 {dayItems.map((item) => (
                   <TaskItem key={item.id} item={item} />

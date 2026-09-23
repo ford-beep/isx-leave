@@ -5,7 +5,11 @@ import { WeeklyPlanEditor } from "@/components/WeeklyPlanEditor";
 import { IconChevronLeft, IconChevronRight } from "@/components/icons";
 import { requireUser } from "@/lib/auth";
 import { companyToday } from "@/lib/date";
-import { getMyWeeklyPlan } from "@/lib/queries";
+import {
+  getHolidays,
+  getMyRequests,
+  getMyWeeklyPlan,
+} from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -129,8 +133,67 @@ export default async function WeeklyPlanPage({
   const previousWeek = addDays(requestedWeek, -7);
   const nextWeek = addDays(requestedWeek, 7);
 
-  const items = await getMyWeeklyPlan(me.id, requestedWeek);
-  const days = buildDays(requestedWeek);
+const weekEnd = addDays(requestedWeek, 6);
+
+const weekYears = Array.from(
+  new Set([
+    Number(requestedWeek.slice(0, 4)),
+    Number(weekEnd.slice(0, 4)),
+  ]),
+);
+
+const [items, requests, holidayGroups] = await Promise.all([
+  getMyWeeklyPlan(me.id, requestedWeek),
+  getMyRequests(me.id),
+  Promise.all(
+    weekYears.map((year) => getHolidays(me.id, year)),
+  ),
+]);
+
+const holidays = holidayGroups
+  .flat()
+  .filter((holiday) => holiday.active);
+
+const approvedLeaves = requests.filter(
+  (request) =>
+    request.status === "approved" &&
+    request.endDate >= requestedWeek &&
+    request.startDate <= weekEnd,
+);
+
+const days = buildDays(requestedWeek).map((day) => {
+  const holiday = holidays.find(
+    (item) => item.date === day.date,
+  );
+
+  const leave = approvedLeaves.find(
+    (request) =>
+      request.startDate <= day.date &&
+      request.endDate >= day.date,
+  );
+
+  let leaveSessionLabel: string | null = null;
+
+  if (leave?.leaveSession === "morning") {
+    leaveSessionLabel = "AM";
+  } else if (leave?.leaveSession === "afternoon") {
+    leaveSessionLabel = "PM";
+  } else if (leave?.leaveSession === "half_day") {
+    leaveSessionLabel = "Half day";
+  }
+
+  return {
+    ...day,
+    holidayName: holiday?.name ?? null,
+    leaveLabel: leave
+      ? `${leave.leaveTypeLabel}${
+          leaveSessionLabel
+            ? ` · ${leaveSessionLabel}`
+            : ""
+        }`
+      : null,
+  };
+});
 
   const isCurrentWeek = requestedWeek === currentWeek;
 
