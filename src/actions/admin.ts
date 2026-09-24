@@ -805,6 +805,50 @@ export async function setDefaultEntitlementAction(_prev: AdminFormState, formDat
   return ok(`Default annual entitlement is now ${value} days. Existing employees keep their own values.`);
 }
 
+export async function setNextYearLeavePlanningAction(
+  _prev: AdminFormState,
+  formData: FormData,
+): Promise<AdminFormState> {
+  const me = await requireAdmin();
+
+  const enabled =
+    String(formData.get("enabled") ?? "false") ===
+    "true";
+
+  try {
+    await withUser(me.id, (db) =>
+      db.query(
+        `
+          insert into app_settings (key, value)
+          values (
+            'allow_next_year_leave',
+            $1::jsonb
+          )
+          on conflict (key)
+          do update set
+            value = excluded.value,
+            updated_at = now()
+        `,
+        [JSON.stringify(enabled)],
+      ),
+    );
+  } catch (e) {
+    return fail(e);
+  }
+
+  revalidateAdmin();
+
+  revalidatePath("/request");
+  revalidatePath("/dashboard");
+  revalidatePath("/calendar");
+
+  return ok(
+    enabled
+      ? "Next-year leave planning is now open."
+      : "Next-year leave planning is now closed.",
+  );
+}
+
 /* ----------------------------------------------------------- office days */
 
 export async function setOfficeDaysAction(_prev: AdminFormState, formData: FormData): Promise<AdminFormState> {

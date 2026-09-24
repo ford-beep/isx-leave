@@ -837,6 +837,17 @@ export async function getSetting(me: string, key: string): Promise<unknown> {
   return r?.value;
 }
 
+export async function getAllowNextYearLeave(
+  me: string,
+): Promise<boolean> {
+  const value = await getSetting(
+    me,
+    "allow_next_year_leave",
+  );
+
+  return value === true;
+}
+
 /* ---------------------------------------------------------- Weekly Plan */
 
 export async function getMyWeeklyPlan(

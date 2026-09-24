@@ -6,6 +6,7 @@ import {
   getHolidays,
   getOfficeDays,
   getWorkSchedule,
+  getAllowNextYearLeave,
 } from "@/lib/queries";
 import { Card, CardHead } from "@/components/ui";
 import { MonthCalendar } from "@/components/MonthCalendar";
@@ -20,8 +21,28 @@ export default async function CalendarPage({
   const me = await requireUser();
   const today = companyToday();
   const sp = await searchParams;
-  const year = Number(sp.y) || Number(today.slice(0, 4));
-  const month = Number(sp.m) || Number(today.slice(5, 7));
+const currentYear = Number(
+  today.slice(0, 4),
+);
+
+const allowNextYearLeave =
+  await getAllowNextYearLeave(me.id);
+
+const maxYear = allowNextYearLeave
+  ? currentYear + 1
+  : currentYear;
+
+const requestedYear =
+  Number(sp.y) || currentYear;
+
+const year = Math.min(
+  requestedYear,
+  maxYear,
+);
+
+const month =
+  Number(sp.m) ||
+  Number(today.slice(5, 7));
 
   const [office, holidays, companyLeaves, workSchedule, birthdays] =
   await Promise.all([
@@ -54,6 +75,7 @@ export default async function CalendarPage({
           <div className="card-body">
           <MonthCalendar
   year={year}
+  maxYear={maxYear}
   month={month}
   officeWeekdays={office.weekdays}
   holidays={holidays}

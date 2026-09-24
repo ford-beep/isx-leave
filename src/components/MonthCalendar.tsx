@@ -22,6 +22,7 @@ export interface CalendarProps {
   officeWeekdays: number[];
   workSchedule: WorkScheduleDay[];
   holidays: Holiday[];
+  maxYear?: number;
 
   /**
    * Normal leave requests.
@@ -77,6 +78,7 @@ export function MonthCalendar({
   mode,
   basePath,
   extraQuery,
+  maxYear,
 }: CalendarProps) {
   const today = companyToday();
 
@@ -173,16 +175,20 @@ export function MonthCalendar({
   }
 
   const prev =
-    month === 1
-      ? { y: year - 1, m: 12 }
-      : { y: year, m: month - 1 };
+  month === 1
+    ? { y: year - 1, m: 12 }
+    : { y: year, m: month - 1 };
 
-  const next =
-    month === 12
-      ? { y: year + 1, m: 1 }
-      : { y: year, m: month + 1 };
+const next =
+  month === 12
+    ? { y: year + 1, m: 1 }
+    : { y: year, m: month + 1 };
 
-  const cells = monthGrid(year, month - 1);
+const canGoNext =
+  maxYear === undefined ||
+  next.y <= maxYear;
+
+const cells = monthGrid(year, month - 1);
 
   return (
     <div>
@@ -215,13 +221,30 @@ export function MonthCalendar({
             Today
           </Link>
 
-          <Link
-            className="btn btn-sm"
-            href={qs(basePath, next.y, next.m, extraQuery)}
-            aria-label="Next month"
-          >
-            <IconChevronRight size={15} />
-          </Link>
+{canGoNext ? (
+  <Link
+    className="btn btn-sm"
+    href={qs(
+      basePath,
+      next.y,
+      next.m,
+      extraQuery,
+    )}
+    aria-label="Next month"
+  >
+    <IconChevronRight size={15} />
+  </Link>
+) : (
+  <button
+    type="button"
+    className="btn btn-sm"
+    disabled
+    aria-label="Next year is not open yet"
+    title="Next year is not open yet"
+  >
+    <IconChevronRight size={15} />
+  </button>
+)}
         </div>
       </div>
 

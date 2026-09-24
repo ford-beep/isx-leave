@@ -4,6 +4,7 @@ import { getHolidays, getHolidayYears, getOfficeDays, getSetting } from "@/lib/q
 import { OfficeDaysForm } from "./OfficeDaysForm";
 import { HolidaySettings } from "./HolidaySettings";
 import { DefaultEntitlementForm } from "./DefaultEntitlementForm";
+import { NextYearLeaveSetting } from "./NextYearLeaveSetting";
 
 export const dynamic = "force-dynamic";
 
@@ -17,11 +18,17 @@ export default async function SettingsPage({
   const years = await getHolidayYears(me.id);
   const holidayYear = Number(sp.hy) || Number(today.slice(0, 4));
 
-  const [office, holidays, defaultEntitlement] = await Promise.all([
-    getOfficeDays(me.id),
-    getHolidays(me.id, holidayYear),
-    getSetting(me.id, "default_annual_entitlement"),
-  ]);
+  const [
+  office,
+  holidays,
+  defaultEntitlement,
+  allowNextYearLeave,
+] = await Promise.all([
+  getOfficeDays(me.id),
+  getHolidays(me.id, holidayYear),
+  getSetting(me.id, "default_annual_entitlement"),
+  getSetting(me.id, "allow_next_year_leave"),
+]);
 
   return (
     <>
@@ -31,6 +38,13 @@ export default async function SettingsPage({
           <p className="muted">Working calendar, holidays and company-wide leave defaults.</p>
         </div>
       </div>
+
+      <div className="section">
+  <NextYearLeaveSetting
+    enabled={allowNextYearLeave === true}
+    currentYear={Number(today.slice(0, 4))}
+  />
+</div>
 
       <div className="grid-2">
         <div className="stack">

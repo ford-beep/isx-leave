@@ -13,6 +13,7 @@ import {
   getOfficeDays,
   getWorkSchedule,
   getSickLeaveUsed,
+  getAllowNextYearLeave,
 } from "@/lib/queries";
 import { Card, CardHead, Kpi } from "@/components/ui";
 import { LeaveTable } from "@/components/LeaveTable";
@@ -44,9 +45,21 @@ export default async function DashboardPage({
   const me = await requireUser();
   const today = companyToday();
   const year = Number(today.slice(0, 4));
+  const allowNextYearLeave =
+  await getAllowNextYearLeave(me.id);
 
+const maxCalendarYear =
+  allowNextYearLeave
+    ? year + 1
+    : year;
   const sp = await searchParams;
-  const calYear = Number(sp.y) || year;
+  const requestedCalYear =
+  Number(sp.y) || year;
+
+const calYear = Math.min(
+  requestedCalYear,
+  maxCalendarYear,
+);
   const calMonth = Number(sp.m) || Number(today.slice(5, 7));
 
   const [
@@ -230,6 +243,7 @@ export default async function DashboardPage({
             <div className="card-body">
               <MonthCalendar
                 year={calYear}
+                maxYear={maxCalendarYear}
                 month={calMonth}
                 officeWeekdays={office.weekdays}
                 workSchedule={workSchedule}

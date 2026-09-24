@@ -48,12 +48,20 @@ type CompDayAllocationPreview = {
 export function RequestForm({
   balance,
   compDayBalance,
+  nextYearBalance,
+  nextYearCompDayBalance,
   today,
+  currentYear,
+  allowNextYearLeave,
   officeDayNames,
 }: {
   balance: LeaveBalance;
   compDayBalance: CompDayBalance;
+  nextYearBalance: LeaveBalance;
+  nextYearCompDayBalance: CompDayBalance;
   today: string;
+  currentYear: number;
+  allowNextYearLeave: boolean;
   officeDayNames: string;
 }) {
   const router = useRouter();
@@ -116,6 +124,34 @@ export function RequestForm({
     ).format(d);
   })();
 
+  const nextYear = currentYear + 1;
+
+const maxLeaveYear = allowNextYearLeave
+  ? nextYear
+  : currentYear;
+
+const maxLeaveDate =
+  `${maxLeaveYear}-12-31`;
+
+const selectedYear = startDate
+  ? Number(startDate.slice(0, 4))
+  : currentYear;
+
+const isNextYear =
+  selectedYear === nextYear;
+
+const activeAnnualBalance = isNextYear
+  ? nextYearBalance
+  : balance;
+
+const activeCompDayBalance = isNextYear
+  ? nextYearCompDayBalance
+  : compDayBalance;
+
+const maxEndDate = startDate
+  ? `${startDate.slice(0, 4)}-12-31`
+  : maxLeaveDate;
+
 useEffect(() => {
   if (!startDate || !endDate) {
     setCalc(null);
@@ -159,9 +195,9 @@ if (res.ok) {
   }, [state, router]);
 
   const availableBalance =
-    leaveType === "comp_day"
-      ? compDayBalance.available
-      : balance.available;
+  leaveType === "comp_day"
+    ? activeCompDayBalance.available
+    : activeAnnualBalance.available;
 
   const overBudget = calc
     ? calc.leaveDays >
@@ -347,31 +383,33 @@ function changeSession(
                   min={
                     earliestStartDate
                   }
+                  max={maxLeaveDate}
                   value={startDate}
-                  onChange={(e) => {
-                    const value =
-                      e.target.value;
+           onChange={(e) => {
+  const value = e.target.value;
 
-                    setStartDate(
-                      value,
-                    );
+  setStartDate(value);
 
-                    if (
-                      isSingleDay
-                    ) {
-                      setEndDate(
-                        value,
-                      );
-                    } else if (
-                      endDate &&
-                      value >
-                        endDate
-                    ) {
-                      setEndDate(
-                        value,
-                      );
-                    }
-                  }}
+  if (isSingleDay) {
+    setEndDate(value);
+    return;
+  }
+
+  if (endDate) {
+    const startYear =
+      value.slice(0, 4);
+
+    const existingEndYear =
+      endDate.slice(0, 4);
+
+    if (
+      value > endDate ||
+      startYear !== existingEndYear
+    ) {
+      setEndDate(value);
+    }
+  }
+}}
                 />
               </Field>
 
@@ -393,6 +431,7 @@ function changeSession(
                       startDate ||
                       earliestStartDate
                     }
+                    max={maxEndDate}
                     value={endDate}
                     onChange={(e) =>
                       setEndDate(
@@ -412,6 +451,12 @@ function changeSession(
                 />
               )}
             </div>
+
+            <p className="tiny">
+  {allowNextYearLeave
+    ? `Next-year leave planning is open. You can request leave through 31 Dec ${nextYear}.`
+    : `Next-year leave planning is currently closed. Requests are limited to ${currentYear}.`}
+</p>
 
             {leaveType ===
               "comp_day" && (
@@ -749,14 +794,13 @@ function changeSession(
         </Card>
 
         <Card>
-          <CardHead
-            title={
-              leaveType ===
-              "comp_day"
-                ? "Your Comp Day balance"
-                : "Your annual leave balance"
-            }
-          />
+<CardHead
+  title={
+    leaveType === "comp_day"
+      ? `Your Comp Day balance — ${selectedYear}`
+      : `Your annual leave balance — ${selectedYear}`
+  }
+/>
 
           <div className="card-body">
             {leaveType ===
@@ -768,7 +812,7 @@ function changeSession(
                   </dt>
                   <dd className="num">
                     {
-                      compDayBalance.earned
+                      activeCompDayBalance.earned
                     }{" "}
                     days
                   </dd>
@@ -778,7 +822,7 @@ function changeSession(
                   </dt>
                   <dd className="num">
                     {
-                      compDayBalance.approved
+                      activeCompDayBalance.approved
                     }{" "}
                     days
                   </dd>
@@ -788,7 +832,7 @@ function changeSession(
                   </dt>
                   <dd className="num">
                     {
-                      compDayBalance.pending
+                      activeCompDayBalance.pending
                     }{" "}
                     days
                   </dd>
@@ -798,7 +842,7 @@ function changeSession(
                   </dt>
                   <dd className="num">
                     {
-                      compDayBalance.remaining
+                      activeCompDayBalance.remaining
                     }{" "}
                     days
                   </dd>
@@ -810,14 +854,14 @@ function changeSession(
                     className="num"
                     style={{
                       color:
-                        compDayBalance.available <=
+                        activeCompDayBalance.available <=
                         1
                           ? "var(--c-warn)"
                           : undefined,
                     }}
                   >
                     {
-                      compDayBalance.available
+                      activeCompDayBalance.available
                     }{" "}
                     days
                   </dd>
@@ -844,7 +888,7 @@ function changeSession(
                   </dt>
                   <dd className="num">
                     {
-                      balance.entitlement
+                      activeAnnualBalance.entitlement
                     }{" "}
                     days
                   </dd>
@@ -854,7 +898,7 @@ function changeSession(
                   </dt>
                   <dd className="num">
                     {
-                      balance.approved
+                      activeAnnualBalance.approved
                     }{" "}
                     days
                   </dd>
@@ -864,7 +908,7 @@ function changeSession(
                   </dt>
                   <dd className="num">
                     {
-                      balance.pending
+                      activeAnnualBalance.pending
                     }{" "}
                     days
                   </dd>
@@ -876,14 +920,14 @@ function changeSession(
                     className="num"
                     style={{
                       color:
-                        balance.available <=
+                        activeAnnualBalance.available <=
                         2
                           ? "var(--c-warn)"
                           : undefined,
                     }}
                   >
                     {
-                      balance.available
+                      activeAnnualBalance.available
                     }{" "}
                     days
                   </dd>

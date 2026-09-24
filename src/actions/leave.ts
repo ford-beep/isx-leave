@@ -9,6 +9,7 @@ import { sendEmail } from "@/lib/email";
 import {
   calcLeaveDays,
   getActiveAdminEmails,
+  getAllowNextYearLeave,
 } from "@/lib/queries";
 import { toFriendlyError } from "@/lib/errors";
 import type { LeaveCalculation } from "@/lib/types";
@@ -139,6 +140,48 @@ export async function submitLeaveAction(
   } = parsed.data;
 
   const today = companyToday();
+
+const allowNextYearLeave =
+  await getAllowNextYearLeave(me.id);
+
+const currentYear = Number(
+  today.slice(0, 4),
+);
+
+const maxLeaveYear =
+  allowNextYearLeave
+    ? currentYear + 1
+    : currentYear;
+
+const startYear = Number(
+  startDate.slice(0, 4),
+);
+
+const endYear = Number(
+  endDate.slice(0, 4),
+);
+
+if (startYear !== endYear) {
+  return {
+    ok: false,
+    message:
+      "A leave request cannot span two calendar years.",
+    field: "endDate",
+  };
+}
+
+if (
+  startYear > maxLeaveYear ||
+  endYear > maxLeaveYear
+) {
+  return {
+    ok: false,
+    message: allowNextYearLeave
+      ? "Leave can only be requested up to next year."
+      : "Next-year leave planning is not open yet.",
+    field: "startDate",
+  };
+}
 
   const earliestStart = new Date(
     `${today}T00:00:00+07:00`,
@@ -510,6 +553,48 @@ export async function previewLeaveAction(
         "Pick both a start and an end date.",
     };
   }
+
+  const today = companyToday();
+
+const allowNextYearLeave =
+  await getAllowNextYearLeave(me.id);
+
+const currentYear = Number(
+  today.slice(0, 4),
+);
+
+const maxLeaveYear =
+  allowNextYearLeave
+    ? currentYear + 1
+    : currentYear;
+
+const startYear = Number(
+  startDate.slice(0, 4),
+);
+
+const endYear = Number(
+  endDate.slice(0, 4),
+);
+
+if (startYear !== endYear) {
+  return {
+    ok: false,
+    message:
+      "A leave request cannot span two calendar years.",
+  };
+}
+
+if (
+  startYear > maxLeaveYear ||
+  endYear > maxLeaveYear
+) {
+  return {
+    ok: false,
+    message: allowNextYearLeave
+      ? "Leave can only be requested up to next year."
+      : "Next-year leave planning is not open yet.",
+  };
+}
 
   if (endDate < startDate) {
     return {
