@@ -20,6 +20,7 @@ import { LeaveTable } from "@/components/LeaveTable";
 import { MonthCalendar } from "@/components/MonthCalendar";
 import { IconPlus } from "@/components/icons";
 import { ChristmasGingerbread } from "@/components/ChristmasGingerbread";
+import { PreHalloweenIntro } from "@/components/PreHalloweenIntro";
 
 export const dynamic = "force-dynamic";
 
@@ -89,8 +90,10 @@ const calYear = Math.min(
   const isChristmas = dashboardSeason === "christmas";
 
   return (
-    <div className={isChristmas ? "dashboard-christmas" : ""}>
-      {/* Christmas background decorations */}
+  <div className={isChristmas ? "dashboard-christmas" : ""}>
+    <PreHalloweenIntro today={today} />
+
+    {/* Christmas background decorations */}
       {isChristmas && (
         <div className="christmas-decorations" aria-hidden="true">
           <img
