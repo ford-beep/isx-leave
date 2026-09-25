@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 
 const PRE_HALLOWEEN_DATES = new Set([
-  "2026-09-25",
   "2026-09-26",
   "2026-09-27",
+  "2026-09-28",
 ]);
 
 export function PreHalloweenIntro({
