@@ -139,8 +139,9 @@ export function MonthCalendar({
   // Existing request data
   // ----------------------------------------------------------
 
-  for (const r of requests) {
-    for (let d = r.startDate; d <= r.endDate; ) {
+ for (const r of requests) {
+  for (let d = r.startDate; d <= r.endDate; ) {
+    if (shouldShowLeave(d)) {
       const list = entriesByDate.get(d) ?? [];
 
       list.push({
@@ -158,12 +159,13 @@ export function MonthCalendar({
       });
 
       entriesByDate.set(d, list);
-
-      const nd = parseISO(d);
-      nd.setUTCDate(nd.getUTCDate() + 1);
-      d = nd.toISOString().slice(0, 10);
     }
+
+    const nd = parseISO(d);
+    nd.setUTCDate(nd.getUTCDate() + 1);
+    d = nd.toISOString().slice(0, 10);
   }
+}
 
   // ----------------------------------------------------------
   // Company-wide approved leave
