@@ -4,7 +4,12 @@ import { IconChevronLeft, IconChevronRight } from "@/components/icons";
 import { Card, CardHead, Person } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
 import { companyToday } from "@/lib/date";
-import { getTeamWeeklyPlan, getWeeklyPlanEmployees } from "@/lib/queries";
+import {
+  getAllRequests,
+  getHolidays,
+  getTeamWeeklyPlan,
+  getWeeklyPlanEmployees,
+} from "@/lib/queries";
 import type { WeeklyPlanCategory, WeeklyPlanItem } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -73,6 +78,11 @@ function buildDays(weekStart: string) {
   });
 }
 
+type PlanDay = ReturnType<typeof buildDays>[number] & {
+  holidayName: string | null;
+  leaveLabel: string | null;
+};
+
 function weeklyPlanHref(weekStart: string, employeeId: string | undefined) {
   const params = new URLSearchParams();
   params.set("week", weekStart);
@@ -91,46 +101,101 @@ function PlanSection({
 }: {
   category: WeeklyPlanCategory;
   items: WeeklyPlanItem[];
-  days: ReturnType<typeof buildDays>;
+  days: PlanDay[];
 }) {
-  const title = category === "priority" ? "Priority" : "Other";
+  const title =
+    category === "priority"
+      ? "Priority"
+      : "Other";
 
   return (
-    <section className={`weekly-plan-section weekly-plan-section-${category}`}>
+    <section
+      className={`weekly-plan-section weekly-plan-${category}`}
+    >
       <div className="weekly-plan-section-head">
         <div>
           <h2>{title}</h2>
+
+          <p className="muted">
+            {category === "priority"
+              ? "The work you want to keep front and center."
+              : "Other tasks, support work, learning, or things that may come up."}
+          </p>
         </div>
       </div>
 
       <div className="weekly-plan-grid">
         {days.map((day) => {
           const dayItems = items.filter(
-            (item) => item.workDate === day.date && item.category === category,
+            (item) =>
+              item.workDate === day.date &&
+              item.category === category,
           );
 
           return (
             <div
               key={day.date}
-              className={`weekly-plan-day ${
-                day.weekend ? "weekly-plan-day-weekend" : ""
-              }`}
+              className={[
+                "weekly-plan-day",
+                day.weekend
+                  ? "is-weekend"
+                  : "",
+                day.leaveLabel
+                  ? "is-leave"
+                  : "",
+                day.holidayName
+                  ? "is-holiday"
+                  : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
             >
               <div className="weekly-plan-day-head">
-                <strong>{day.name}</strong>
-                <span>{day.dayNumber}</span>
+                <span>{day.name}</span>
+                <strong>{day.dayNumber}</strong>
               </div>
+
+              {day.leaveLabel ||
+              day.holidayName ? (
+                <div className="weekly-plan-day-status">
+                  {day.leaveLabel ? (
+                    <div className="weekly-plan-day-note is-leave">
+                      <span aria-hidden="true">
+                        🏖️
+                      </span>
+
+                      <span>
+                        {day.leaveLabel}
+                      </span>
+                    </div>
+                  ) : null}
+
+                  {day.holidayName ? (
+                    <div className="weekly-plan-day-note is-holiday">
+                      <span aria-hidden="true">
+                        🎉
+                      </span>
+
+                      <span>
+                        {day.holidayName}
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
 
               <div className="weekly-plan-day-body">
                 {dayItems.length === 0 ? (
-                  <div className="weekly-plan-admin-empty">—</div>
+                  <div className="weekly-plan-admin-empty">
+                    —
+                  </div>
                 ) : (
                   dayItems.map((item) => (
                     <div
                       key={item.id}
-                      className={`weekly-plan-task weekly-plan-task-${category}`}
+                      className="weekly-plan-task"
                     >
-                      <div className="weekly-plan-admin-task-content">
+                      <div className="weekly-plan-task-content">
                         {item.content}
                       </div>
                     </div>
@@ -174,14 +239,139 @@ export default async function AdminWeeklyPlansPage({
     employees.find((employee) => employee.role === "employee") ??
     employees[0];
 
-  const items = selectedEmployee
-    ? await getTeamWeeklyPlan(me.id, requestedWeek, selectedEmployee.id)
-    : [];
+  const weekEnd = addDays(
+  requestedWeek,
+  6,
+);
 
-  const days = buildDays(requestedWeek);
-  const previousWeek = addDays(requestedWeek, -7);
-  const nextWeek = addDays(requestedWeek, 7);
-  const isCurrentWeek = requestedWeek === currentWeek;
+const weekYears = Array.from(
+  new Set([
+    Number(
+      requestedWeek.slice(0, 4),
+    ),
+    Number(
+      weekEnd.slice(0, 4),
+    ),
+  ]),
+);
+
+const items = selectedEmployee
+  ? await getTeamWeeklyPlan(
+      me.id,
+      requestedWeek,
+      selectedEmployee.id,
+    )
+  : [];
+
+const requests = selectedEmployee
+  ? await getAllRequests(
+      me.id,
+      {
+        status: "approved",
+        employeeId:
+          selectedEmployee.id,
+      },
+    )
+  : [];
+
+const holidayGroups =
+  await Promise.all(
+    weekYears.map((year) =>
+      getHolidays(me.id, year),
+    ),
+  );
+
+const holidays = holidayGroups
+  .flat()
+  .filter(
+    (holiday) =>
+      holiday.active,
+  );
+
+const approvedLeaves =
+  requests.filter(
+    (request) =>
+      request.status ===
+        "approved" &&
+      request.endDate >=
+        requestedWeek &&
+      request.startDate <=
+        weekEnd,
+  );
+
+const days: PlanDay[] =
+  buildDays(requestedWeek).map(
+    (day) => {
+      const holiday =
+        holidays.find(
+          (item) =>
+            item.date ===
+            day.date,
+        );
+
+      const leave =
+        approvedLeaves.find(
+          (request) =>
+            request.startDate <=
+              day.date &&
+            request.endDate >=
+              day.date,
+        );
+
+      let leaveSessionLabel:
+        | string
+        | null = null;
+
+      if (
+        leave?.leaveSession ===
+        "morning"
+      ) {
+        leaveSessionLabel = "AM";
+      } else if (
+        leave?.leaveSession ===
+        "afternoon"
+      ) {
+        leaveSessionLabel = "PM";
+      } else if (
+        leave?.leaveSession ===
+        "half_day"
+      ) {
+        leaveSessionLabel =
+          "Half day";
+      }
+
+      return {
+        ...day,
+
+        holidayName:
+          holiday?.name ?? null,
+
+        leaveLabel: leave
+          ? `${
+              leave.leaveTypeLabel
+            }${
+              leaveSessionLabel
+                ? ` · ${leaveSessionLabel}`
+                : ""
+            }`
+          : null,
+      };
+    },
+  );
+
+const previousWeek = addDays(
+  requestedWeek,
+  -7,
+);
+
+const nextWeek = addDays(
+  requestedWeek,
+  7,
+);
+
+const isCurrentWeek =
+  requestedWeek === currentWeek;
+
 
   return (
     <>
