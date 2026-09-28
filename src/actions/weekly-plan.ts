@@ -47,6 +47,34 @@ const deleteWeeklyPlanItemSchema = z.object({
   id: z.string().uuid("Invalid task."),
 });
 
+const weeklyPlanDragLayoutItemSchema = z.object({
+  id: z.string().uuid("Invalid task."),
+  workDate: isoDateSchema,
+  sortOrder: z.number().int().min(0),
+});
+
+const weeklyPlanDragSchema = z.object({
+  weekStart: isoDateSchema,
+  category: categorySchema,
+  sourceId: z.string().uuid("Invalid task."),
+  mode: z.enum(["move", "copy"]),
+  layout: z.array(weeklyPlanDragLayoutItemSchema).max(500),
+  copyWorkDate: isoDateSchema.optional(),
+  copySortOrder: z.number().int().min(0).optional(),
+});
+
+function addDaysISO(date: string, days: number) {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function isDateInsideWeek(date: string, weekStart: string) {
+  const weekEnd = addDaysISO(weekStart, 6);
+
+  return date >= weekStart && date <= weekEnd;
+}
+
 function firstIssue(parsed: {
   success: false;
   error: z.ZodError;
@@ -232,6 +260,246 @@ export async function deleteWeeklyPlanItemAction(
   return {
     ok: true,
     message: "Task deleted.",
+  };
+}
+
+export async function applyWeeklyPlanDragAction(
+  _prevState: WeeklyPlanActionState,
+  formData: FormData,
+): Promise<WeeklyPlanActionState> {
+  const me = await requireUser();
+
+  let layout: unknown;
+
+  try {
+    layout = JSON.parse(
+      String(formData.get("layout") ?? "[]"),
+    );
+  } catch {
+    return {
+      ok: false,
+      message: "Invalid task layout.",
+    };
+  }
+
+  const copyWorkDateRaw =
+    String(formData.get("copyWorkDate") ?? "").trim();
+
+  const copySortOrderRaw =
+    String(formData.get("copySortOrder") ?? "").trim();
+
+  const parsed = weeklyPlanDragSchema.safeParse({
+    weekStart: String(
+      formData.get("weekStart") ?? "",
+    ),
+
+    category: String(
+      formData.get("category") ?? "",
+    ),
+
+    sourceId: String(
+      formData.get("sourceId") ?? "",
+    ),
+
+    mode: String(
+      formData.get("mode") ?? "",
+    ),
+
+    layout,
+
+    copyWorkDate:
+      copyWorkDateRaw || undefined,
+
+    copySortOrder:
+      copySortOrderRaw
+        ? Number(copySortOrderRaw)
+        : undefined,
+  });
+
+  if (!parsed.success) {
+    return firstIssue(parsed);
+  }
+
+  const {
+    weekStart,
+    category,
+    sourceId,
+    mode,
+    copyWorkDate,
+    copySortOrder,
+  } = parsed.data;
+
+  if (
+    parsed.data.layout.some(
+      (item) =>
+        !isDateInsideWeek(
+          item.workDate,
+          weekStart,
+        ),
+    )
+  ) {
+    return {
+      ok: false,
+      message:
+        "Tasks can only be moved within the selected week.",
+    };
+  }
+
+  if (mode === "copy") {
+    if (
+      copyWorkDate === undefined ||
+      copySortOrder === undefined
+    ) {
+      return {
+        ok: false,
+        message:
+          "Choose where the copied task should be placed.",
+      };
+    }
+
+    if (
+      !isDateInsideWeek(
+        copyWorkDate,
+        weekStart,
+      )
+    ) {
+      return {
+        ok: false,
+        message:
+          "Tasks can only be copied within the selected week.",
+      };
+    }
+  }
+
+  const layoutForDb =
+    parsed.data.layout.map((item) => ({
+      id: item.id,
+      work_date: item.workDate,
+      sort_order: item.sortOrder,
+    }));
+
+  try {
+    const result = await withUser(
+      me.id,
+      async (db) =>
+        db.query<{
+          updated_count: number;
+          copied_count: number;
+        }>(
+          `
+            with source as (
+              select
+                id,
+                employee_id,
+                week_start,
+                category,
+                content
+              from weekly_plan_items
+              where id = $1
+                and employee_id = $2
+                and week_start = $3::date
+                and category = $4
+            ),
+
+            copied as (
+              insert into weekly_plan_items (
+                employee_id,
+                week_start,
+                work_date,
+                category,
+                content,
+                sort_order
+              )
+              select
+                source.employee_id,
+                source.week_start,
+                $7::date,
+                source.category,
+                source.content,
+                $8::int
+              from source
+              where $5::boolean = true
+              returning id
+            ),
+
+            layout as (
+              select *
+              from jsonb_to_recordset(
+                $6::jsonb
+              ) as x(
+                id uuid,
+                work_date text,
+                sort_order integer
+              )
+            ),
+
+            updated as (
+              update weekly_plan_items item
+              set
+                work_date =
+                  layout.work_date::date,
+                sort_order =
+                  layout.sort_order
+              from layout
+              where item.id = layout.id
+                and item.employee_id = $2
+                and item.week_start = $3::date
+                and item.category = $4
+              returning item.id
+            )
+
+            select
+              (
+                select count(*)::int
+                from updated
+              ) as updated_count,
+
+              (
+                select count(*)::int
+                from copied
+              ) as copied_count
+          `,
+          [
+            sourceId,
+            me.id,
+            weekStart,
+            category,
+            mode === "copy",
+            JSON.stringify(layoutForDb),
+            copyWorkDate ?? null,
+            copySortOrder ?? null,
+          ],
+        ),
+    );
+
+    const row = result.rows[0];
+
+    if (
+      mode === "copy" &&
+      row?.copied_count !== 1
+    ) {
+      return {
+        ok: false,
+        message: "Task could not be copied.",
+      };
+    }
+  } catch (error) {
+    const friendly = toFriendlyError(error);
+
+    return {
+      ok: false,
+      message: friendly.message,
+    };
+  }
+
+  revalidateWeeklyPlan();
+
+  return {
+    ok: true,
+    message:
+      mode === "copy"
+        ? "Task copied."
+        : "Task moved.",
   };
 }
 
