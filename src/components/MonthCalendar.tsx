@@ -89,8 +89,23 @@ export function MonthCalendar({
   );
 
   const holidayByDate = new Map(
-    holidays.filter((h) => h.active).map((h) => [h.date, h]),
+  holidays
+    .filter((h) => h.active)
+    .map((h) => [h.date, h]),
   );
+
+  function shouldShowLeave(date: string) {
+  const dt = parseISO(date);
+  const day = dt.getUTCDay();
+
+  const isWeekend =
+    day === 0 || day === 6;
+
+  const isHoliday =
+    holidayByDate.has(date);
+
+  return !isWeekend && !isHoliday;
+}
 
   const birthdaysByDay = new Map<number, CalendarBirthday[]>();
 
@@ -154,25 +169,31 @@ export function MonthCalendar({
   // Company-wide approved leave
   // ----------------------------------------------------------
 
-  for (const r of companyLeaves) {
-    for (let d = r.startDate; d <= r.endDate; ) {
+for (const r of companyLeaves) {
+  for (let d = r.startDate; d <= r.endDate; ) {
+    if (shouldShowLeave(d)) {
       const list = entriesByDate.get(d) ?? [];
 
       list.push({
-        label: r.isMyLeave ? "My leave" : r.employeeName,
+        label: r.isMyLeave
+          ? "My leave"
+          : r.employeeName,
+
         status: "approved",
+
         title: r.isMyLeave
           ? "My leave"
           : `${r.employeeName} — On leave`,
       });
 
       entriesByDate.set(d, list);
-
-      const nd = parseISO(d);
-      nd.setUTCDate(nd.getUTCDate() + 1);
-      d = nd.toISOString().slice(0, 10);
     }
+
+    const nd = parseISO(d);
+    nd.setUTCDate(nd.getUTCDate() + 1);
+    d = nd.toISOString().slice(0, 10);
   }
+}
 
   const prev =
   month === 1
