@@ -11,6 +11,7 @@ export type WeeklyPlanActionState =
   | {
       ok: true;
       message: string;
+      copiedIds?: string[];
     }
   | {
       ok: false;
@@ -503,9 +504,21 @@ export async function applyWeeklyPlanDragAction(
   };
 }
 
-const copyLastWeekSchema = z.object({
-  weekStart: isoDateSchema,
-});
+const copyLastWeekSchema = z.discriminatedUnion("intent", [
+  z.object({
+    intent: z.literal("copy"),
+    weekStart: isoDateSchema,
+  }),
+
+  z.object({
+    intent: z.literal("undo"),
+    weekStart: isoDateSchema,
+    copiedIds: z
+      .array(z.string().uuid("Invalid copied task."))
+      .min(1)
+      .max(500),
+  }),
+]);
 
 export async function copyLastWeekAction(
   _prevState: WeeklyPlanActionState,
@@ -513,8 +526,31 @@ export async function copyLastWeekAction(
 ): Promise<WeeklyPlanActionState> {
   const me = await requireUser();
 
+  const intent = String(
+    formData.get("intent") ?? "copy",
+  );
+
+  let copiedIds: unknown = undefined;
+
+  if (intent === "undo") {
+    try {
+      copiedIds = JSON.parse(
+        String(formData.get("copiedIds") ?? "[]"),
+      );
+    } catch {
+      return {
+        ok: false,
+        message: "Invalid undo data.",
+      };
+    }
+  }
+
   const parsed = copyLastWeekSchema.safeParse({
-    weekStart: String(formData.get("weekStart") ?? ""),
+    intent,
+    weekStart: String(
+      formData.get("weekStart") ?? "",
+    ),
+    copiedIds,
   });
 
   if (!parsed.success) {
@@ -523,56 +559,197 @@ export async function copyLastWeekAction(
 
   const { weekStart } = parsed.data;
 
+  /*
+   * Undo the most recent "Copy last week".
+   *
+   * Only the IDs returned by that copy operation are removed.
+   * Employee and week checks prevent touching another
+   * person's Weekly Plan or another week.
+   */
+  if (parsed.data.intent === "undo") {
+    const undoCopiedIds = parsed.data.copiedIds;
+
+    try {
+      const result = await withUser(
+        me.id,
+        async (db) =>
+          db.query(
+            `
+              delete from weekly_plan_items
+              where employee_id = $1
+                and week_start = $2::date
+                and id = any($3::uuid[])
+              returning id
+            `,
+            [
+              me.id,
+              weekStart,
+              undoCopiedIds,
+            ],
+          ),
+      );
+
+      revalidateWeeklyPlan();
+
+      const removed =
+        result.rowCount ?? 0;
+
+      return {
+        ok: true,
+        message:
+          removed === 0
+            ? "Nothing to undo."
+            : `Undo complete. Removed ${removed} copied task${
+                removed === 1
+                  ? ""
+                  : "s"
+              }.`,
+      };
+    } catch (error) {
+      const friendly =
+        toFriendlyError(error);
+
+      return {
+        ok: false,
+        message: friendly.message,
+      };
+    }
+  }
+
+  /*
+   * Copy last week's tasks.
+   *
+   * Important:
+   * - Existing tasks are never replaced.
+   * - Copied tasks are appended AFTER existing tasks
+   *   for the same day + category.
+   * - The relative order from last week is preserved.
+   */
   try {
-    const result = await withUser(me.id, async (db) =>
-      db.query(
-        `
-          insert into weekly_plan_items (
-            employee_id,
-            week_start,
-            work_date,
-            category,
-            content,
-            sort_order
-          )
-          select
-            previous.employee_id,
-            $1::date,
-            previous.work_date + 7,
-            previous.category,
-            previous.content,
-            previous.sort_order
-          from weekly_plan_items previous
-          where previous.employee_id = $2
-            and previous.week_start = ($1::date - 7)
-            and not exists (
-              select 1
-              from weekly_plan_items current
-              where current.employee_id = $2
-                and current.week_start = $1::date
-                and current.work_date = previous.work_date + 7
-                and current.category = previous.category
-                and btrim(current.content) = btrim(previous.content)
+    const result = await withUser(
+      me.id,
+      async (db) =>
+        db.query<{ id: string }>(
+          `
+            with source as (
+              select
+                previous.employee_id,
+                previous.work_date + 7
+                  as target_work_date,
+                previous.category,
+                previous.content,
+
+                row_number() over (
+                  partition by
+                    previous.work_date,
+                    previous.category
+                  order by
+                    previous.sort_order,
+                    previous.created_at,
+                    previous.id
+                ) - 1
+                  as copy_offset
+
+              from weekly_plan_items previous
+
+              where previous.employee_id = $2
+                and previous.week_start =
+                  ($1::date - 7)
+
+                and not exists (
+                  select 1
+                  from weekly_plan_items current
+                  where current.employee_id = $2
+                    and current.week_start =
+                      $1::date
+                    and current.work_date =
+                      previous.work_date + 7
+                    and current.category =
+                      previous.category
+                    and btrim(current.content) =
+                      btrim(previous.content)
+                )
+            ),
+
+            prepared as (
+              select
+                source.*,
+
+                coalesce(
+                  (
+                    select
+                      max(current.sort_order) + 1
+                    from weekly_plan_items current
+                    where
+                      current.employee_id = $2
+                      and current.week_start =
+                        $1::date
+                      and current.work_date =
+                        source.target_work_date
+                      and current.category =
+                        source.category
+                  ),
+                  0
+                ) as base_sort_order
+
+              from source
             )
-          returning id
-        `,
-        [weekStart, me.id],
-      ),
+
+            insert into weekly_plan_items (
+              employee_id,
+              week_start,
+              work_date,
+              category,
+              content,
+              sort_order
+            )
+
+            select
+              employee_id,
+              $1::date,
+              target_work_date,
+              category,
+              content,
+              base_sort_order +
+                copy_offset::int
+
+            from prepared
+
+            order by
+              target_work_date,
+              category,
+              copy_offset
+
+            returning id
+          `,
+          [weekStart, me.id],
+        ),
     );
 
     revalidateWeeklyPlan();
 
-    const copied = result.rowCount ?? 0;
+    const ids = result.rows.map(
+      (row) => row.id,
+    );
+
+    const copied = ids.length;
 
     return {
       ok: true,
       message:
         copied === 0
           ? "Nothing new to copy from last week."
-          : `Copied ${copied} task${copied === 1 ? "" : "s"} from last week.`,
+          : `Copied ${copied} task${
+              copied === 1 ? "" : "s"
+            } from last week.`,
+      copiedIds:
+        copied > 0
+          ? ids
+          : undefined,
     };
   } catch (error) {
-    const friendly = toFriendlyError(error);
+    const friendly =
+      toFriendlyError(error);
 
     return {
       ok: false,

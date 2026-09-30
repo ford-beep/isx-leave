@@ -1,38 +1,135 @@
 "use client";
 
-import { useActionState } from "react";
+import {
+  useState,
+  useTransition,
+} from "react";
+import { useRouter } from "next/navigation";
 
 import {
   copyLastWeekAction,
   type WeeklyPlanActionState,
 } from "@/actions/weekly-plan";
 
-const initialState: WeeklyPlanActionState = null;
+export function CopyLastWeekButton({
+  weekStart,
+}: {
+  weekStart: string;
+}) {
+  const router = useRouter();
 
-export function CopyLastWeekButton({ weekStart }: { weekStart: string }) {
-  const [state, action, pending] = useActionState(
-    copyLastWeekAction,
-    initialState,
-  );
+  const [pending, startTransition] =
+    useTransition();
+
+  const [state, setState] =
+    useState<WeeklyPlanActionState>(null);
+
+  const [lastCopiedIds, setLastCopiedIds] =
+    useState<string[]>([]);
+
+  function handleCopy() {
+    startTransition(async () => {
+      const formData = new FormData();
+
+      formData.set("intent", "copy");
+      formData.set(
+        "weekStart",
+        weekStart,
+      );
+
+      const result =
+        await copyLastWeekAction(
+          null,
+          formData,
+        );
+
+      setState(result);
+
+      if (
+        result?.ok &&
+        result.copiedIds?.length
+      ) {
+        setLastCopiedIds(
+          result.copiedIds,
+        );
+      } else {
+        setLastCopiedIds([]);
+      }
+
+      router.refresh();
+    });
+  }
+
+  function handleUndo() {
+    if (lastCopiedIds.length === 0) {
+      return;
+    }
+
+    startTransition(async () => {
+      const formData = new FormData();
+
+      formData.set("intent", "undo");
+      formData.set(
+        "weekStart",
+        weekStart,
+      );
+      formData.set(
+        "copiedIds",
+        JSON.stringify(
+          lastCopiedIds,
+        ),
+      );
+
+      const result =
+        await copyLastWeekAction(
+          null,
+          formData,
+        );
+
+      setState(result);
+
+      if (result?.ok) {
+        setLastCopiedIds([]);
+      }
+
+      router.refresh();
+    });
+  }
 
   return (
     <div className="weekly-plan-copy">
-      <form action={action}>
-        <input type="hidden" name="weekStart" value={weekStart} />
-
-        <button type="submit" className="btn btn-sm" disabled={pending}>
-          {pending ? "Copying..." : "Copy last week"}
-        </button>
-      </form>
+      <button
+        type="button"
+        className="btn btn-sm"
+        onClick={handleCopy}
+        disabled={pending}
+      >
+        {pending
+          ? "Working..."
+          : "Copy last week"}
+      </button>
 
       {state ? (
         <span
           className={
-            state.ok ? "weekly-plan-copy-message" : "weekly-plan-error"
+            state.ok
+              ? "weekly-plan-copy-message"
+              : "weekly-plan-error"
           }
         >
           {state.message}
         </span>
+      ) : null}
+
+      {lastCopiedIds.length > 0 ? (
+        <button
+          type="button"
+          className="btn btn-sm btn-ghost"
+          onClick={handleUndo}
+          disabled={pending}
+        >
+          Undo
+        </button>
       ) : null}
     </div>
   );
