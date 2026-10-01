@@ -11,6 +11,100 @@ import {
   type WeeklyPlanActionState,
 } from "@/actions/weekly-plan";
 
+function addDays(
+  value: string,
+  amount: number,
+) {
+  const date = new Date(
+    `${value}T00:00:00Z`,
+  );
+
+  date.setUTCDate(
+    date.getUTCDate() + amount,
+  );
+
+  return date
+    .toISOString()
+    .slice(0, 10);
+}
+
+function formatWeekRange(
+  weekStart: string,
+) {
+  const start = new Date(
+    `${weekStart}T00:00:00Z`,
+  );
+
+  const end = new Date(
+    `${addDays(
+      weekStart,
+      6,
+    )}T00:00:00Z`,
+  );
+
+  const sameMonth =
+    start.getUTCMonth() ===
+      end.getUTCMonth() &&
+    start.getUTCFullYear() ===
+      end.getUTCFullYear();
+
+  const sameYear =
+    start.getUTCFullYear() ===
+    end.getUTCFullYear();
+
+  if (sameMonth) {
+    const month =
+      new Intl.DateTimeFormat(
+        "en-GB",
+        {
+          month: "short",
+          timeZone: "UTC",
+        },
+      ).format(start);
+
+    return `${start.getUTCDate()}–${end.getUTCDate()} ${month} ${start.getUTCFullYear()}`;
+  }
+
+  if (sameYear) {
+    const startText =
+      new Intl.DateTimeFormat(
+        "en-GB",
+        {
+          day: "numeric",
+          month: "short",
+          timeZone: "UTC",
+        },
+      ).format(start);
+
+    const endText =
+      new Intl.DateTimeFormat(
+        "en-GB",
+        {
+          day: "numeric",
+          month: "short",
+          timeZone: "UTC",
+        },
+      ).format(end);
+
+    return `${startText} – ${endText} ${start.getUTCFullYear()}`;
+  }
+
+  const formatter =
+    new Intl.DateTimeFormat(
+      "en-GB",
+      {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        timeZone: "UTC",
+      },
+    );
+
+  return `${formatter.format(
+    start,
+  )} – ${formatter.format(end)}`;
+}
+
 export function CopyLastWeekButton({
   weekStart,
 }: {
@@ -22,16 +116,48 @@ export function CopyLastWeekButton({
     useTransition();
 
   const [state, setState] =
-    useState<WeeklyPlanActionState>(null);
+    useState<WeeklyPlanActionState>(
+      null,
+    );
 
-  const [lastCopiedIds, setLastCopiedIds] =
-    useState<string[]>([]);
+  const [
+    lastCopiedIds,
+    setLastCopiedIds,
+  ] = useState<string[]>([]);
 
   function handleCopy() {
-    startTransition(async () => {
-      const formData = new FormData();
+    const previousWeek =
+      addDays(weekStart, -7);
 
-      formData.set("intent", "copy");
+    const confirmed =
+      window.confirm(
+        [
+          "Copy tasks from last week?",
+          "",
+          `${formatWeekRange(
+            previousWeek,
+          )} → ${formatWeekRange(
+            weekStart,
+          )}`,
+          "",
+          "Existing tasks will stay.",
+          "Copied tasks will be added below them.",
+        ].join("\n"),
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    startTransition(async () => {
+      const formData =
+        new FormData();
+
+      formData.set(
+        "intent",
+        "copy",
+      );
+
       formData.set(
         "weekStart",
         weekStart,
@@ -61,18 +187,26 @@ export function CopyLastWeekButton({
   }
 
   function handleUndo() {
-    if (lastCopiedIds.length === 0) {
+    if (
+      lastCopiedIds.length === 0
+    ) {
       return;
     }
 
     startTransition(async () => {
-      const formData = new FormData();
+      const formData =
+        new FormData();
 
-      formData.set("intent", "undo");
+      formData.set(
+        "intent",
+        "undo",
+      );
+
       formData.set(
         "weekStart",
         weekStart,
       );
+
       formData.set(
         "copiedIds",
         JSON.stringify(
@@ -121,7 +255,8 @@ export function CopyLastWeekButton({
         </span>
       ) : null}
 
-      {lastCopiedIds.length > 0 ? (
+      {lastCopiedIds.length >
+      0 ? (
         <button
           type="button"
           className="btn btn-sm btn-ghost"
