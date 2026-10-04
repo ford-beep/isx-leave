@@ -1,13 +1,18 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth";
-import { companyToday, formatRange, relativeDayLabel } from "@/lib/date";
+import {
+  companyToday,
+  formatRange,
+  monthGrid,
+  relativeDayLabel,
+} from "@/lib/date";
 import { getDashboardQuote } from "@/lib/dashboardQuote";
 import { getDashboardSeason } from "@/lib/dashboardSeason";
 import {
   getBalance,
   getCalendarBirthdays,
-  getCompanyLeaveCalendar,
-  getHolidays,
+  getCompanyLeaveCalendarRange,
+  getHolidaysInRange,
   getMyRequests,
   getNextUpcomingLeave,
   getOfficeDays,
@@ -63,6 +68,20 @@ const calYear = Math.min(
 );
   const calMonth = Number(sp.m) || Number(today.slice(5, 7));
 
+  const visibleDates =
+  monthGrid(
+    calYear,
+    calMonth - 1,
+  );
+
+const visibleStart =
+  visibleDates[0]!;
+
+const visibleEnd =
+  visibleDates[
+    visibleDates.length - 1
+  ]!;
+
   const [
     balance,
     sickLeaveUsed,
@@ -79,8 +98,16 @@ const calYear = Math.min(
     getNextUpcomingLeave(me.id),
     getMyRequests(me.id, 5),
     getOfficeDays(me.id),
-    getHolidays(me.id, calYear),
-    getCompanyLeaveCalendar(me.id, calYear, calMonth),
+    getHolidaysInRange(
+  me.id,
+  visibleStart,
+  visibleEnd,
+),
+getCompanyLeaveCalendarRange(
+  me.id,
+  visibleStart,
+  visibleEnd,
+),
     getWorkSchedule(me.id, calYear, calMonth),
     getCalendarBirthdays(me.id),
   ]);

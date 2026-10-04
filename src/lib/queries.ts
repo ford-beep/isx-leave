@@ -158,6 +158,41 @@ export async function getHolidayYears(me: string): Promise<number[]> {
   return rows.map((r) => r.year);
 }
 
+export async function getHolidaysInRange(
+  me: string,
+  startDate: string,
+  endDate: string,
+): Promise<Holiday[]> {
+  const rows = await queryAs<Record<string, any>>(
+    me,
+    `select
+       id,
+       holiday_date::text as date,
+       name,
+       name_th,
+       type,
+       source,
+       year,
+       active
+     from holidays
+     where holiday_date >= $1::date
+       and holiday_date <= $2::date
+     order by holiday_date`,
+    [startDate, endDate],
+  );
+
+  return rows.map((r) => ({
+    id: r.id,
+    date: r.date,
+    name: r.name,
+    nameTh: r.name_th,
+    type: r.type,
+    source: r.source,
+    year: r.year,
+    active: r.active,
+  }));
+}
+
 /**
  * Server-side leave-day calculation. Delegates to the SAME SQL function the
  * insert trigger uses, so the preview shown in the form can never disagree
@@ -431,6 +466,40 @@ export async function getRequestsInMonth(
   return rows.map(mapRequest);
 }
 
+export async function getRequestsInRange(
+  me: string,
+  startDate: string,
+  endDate: string,
+  employeeId?: string,
+): Promise<LeaveRequest[]> {
+  const params: unknown[] = [
+    startDate,
+    endDate,
+  ];
+
+  let employeeFilter = "";
+
+  if (employeeId) {
+    params.push(employeeId);
+    employeeFilter =
+      "and lr.employee_id = $3";
+  }
+
+  const rows =
+    await queryAs<Record<string, any>>(
+      me,
+      `select ${REQUEST_COLUMNS} ${REQUEST_FROM}
+       where lr.status in ('approved', 'pending')
+         and lr.start_date <= $2::date
+         and lr.end_date >= $1::date
+         ${employeeFilter}
+       order by lr.start_date`,
+      params,
+    );
+
+  return rows.map(mapRequest);
+}
+
 export async function getActiveAdminEmails(me: string): Promise<string[]> {
   const testRecipient =
     process.env.NODE_ENV !== "production"
@@ -503,6 +572,36 @@ export async function getCompanyLeaveCalendar(
      )`,
     [monthStart],
   );
+
+  return rows.map((r) => ({
+    employeeId: r.employee_id,
+    employeeName: r.employee_name,
+    startDate: r.start_date,
+    endDate: r.end_date,
+    isMyLeave: r.is_my_leave,
+  }));
+}
+
+export async function getCompanyLeaveCalendarRange(
+  me: string,
+  startDate: string,
+  endDate: string,
+): Promise<CompanyCalendarLeave[]> {
+  const rows =
+    await queryAs<Record<string, any>>(
+      me,
+      `select
+         employee_id,
+         employee_name,
+         start_date::text as start_date,
+         end_date::text as end_date,
+         is_my_leave
+       from app.company_leave_calendar(
+         $1::date,
+         $2::date
+       )`,
+      [startDate, endDate],
+    );
 
   return rows.map((r) => ({
     employeeId: r.employee_id,

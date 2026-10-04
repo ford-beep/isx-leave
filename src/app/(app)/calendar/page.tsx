@@ -1,9 +1,14 @@
 import { requireUser } from "@/lib/auth";
-import { companyToday, formatDate, WEEKDAY_NAMES } from "@/lib/date";
+import {
+  companyToday,
+  formatDate,
+  monthGrid,
+  WEEKDAY_NAMES,
+} from "@/lib/date";
 import {
   getCalendarBirthdays,
-  getCompanyLeaveCalendar,
-  getHolidays,
+  getCompanyLeaveCalendarRange,
+  getHolidaysInRange,
   getOfficeDays,
   getWorkSchedule,
   getAllowNextYearLeave,
@@ -44,17 +49,42 @@ const month =
   Number(sp.m) ||
   Number(today.slice(5, 7));
 
+  const visibleDates =
+  monthGrid(year, month - 1);
+
+const visibleStart =
+  visibleDates[0]!;
+
+const visibleEnd =
+  visibleDates[
+    visibleDates.length - 1
+  ]!;
+
   const [office, holidays, companyLeaves, workSchedule, birthdays] =
   await Promise.all([
     getOfficeDays(me.id),
-    getHolidays(me.id, year),
-    getCompanyLeaveCalendar(me.id, year, month),
+    getHolidaysInRange(
+  me.id,
+  visibleStart,
+  visibleEnd,
+),
+getCompanyLeaveCalendarRange(
+  me.id,
+  visibleStart,
+  visibleEnd,
+),
     getWorkSchedule(me.id, year, month),
     getCalendarBirthdays(me.id),
   ]);
 
-  const monthHolidays = holidays.filter(
-    (h) => h.active && Number(h.date.slice(5, 7)) === month,
+const monthPrefix =
+  `${year}-${String(month).padStart(2, "0")}-`;
+
+const monthHolidays =
+  holidays.filter(
+    (h) =>
+      h.active &&
+      h.date.startsWith(monthPrefix),
   );
 
   return (

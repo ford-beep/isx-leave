@@ -3,19 +3,21 @@ import {
   companyToday,
   formatDate,
   formatRange,
+  monthGrid,
   WEEKDAY_NAMES,
 } from "@/lib/date";
 import {
   getCalendarBirthdays,
   getEmployeeOverview,
-  getHolidays,
+  getHolidaysInRange,
   getOfficeDays,
-  getRequestsInMonth,
+  getRequestsInRange,
   getWorkSchedule,
 } from "@/lib/queries";
 import { Card, CardHead } from "@/components/ui";
 import { MonthCalendar } from "@/components/MonthCalendar";
 import { FilterSelect } from "@/components/FilterSelect";
+
 
 export const dynamic = "force-dynamic";
 
@@ -29,23 +31,64 @@ export default async function AdminCalendarPage({
   const sp = await searchParams;
   const year = Number(sp.y) || Number(today.slice(0, 4));
   const month = Number(sp.m) || Number(today.slice(5, 7));
+  const visibleDates =
+  monthGrid(year, month - 1);
+
+const visibleStart =
+  visibleDates[0]!;
+
+const visibleEnd =
+  visibleDates[
+    visibleDates.length - 1
+  ]!;
   const employeeId =
     sp.employee && sp.employee !== "all" ? sp.employee : undefined;
 
 const [office, holidays, requests, employees, workSchedule, birthdays] =
   await Promise.all([
     getOfficeDays(me.id),
-    getHolidays(me.id, year),
-    getRequestsInMonth(me.id, year, month, employeeId),
+    getHolidaysInRange(
+  me.id,
+  visibleStart,
+  visibleEnd,
+),
+getRequestsInRange(
+  me.id,
+  visibleStart,
+  visibleEnd,
+  employeeId,
+),
     getEmployeeOverview(me.id, year),
     getWorkSchedule(me.id, year, month),
     getCalendarBirthdays(me.id),
   ]);
 
-  const monthHolidays = holidays.filter(
-    (h) => h.active && Number(h.date.slice(5, 7)) === month,
+  const monthPrefix =
+  `${year}-${String(month).padStart(2, "0")}-`;
+
+const monthStart =
+  `${monthPrefix}01`;
+
+const nextMonthStart =
+  month === 12
+    ? `${year + 1}-01-01`
+    : `${year}-${String(
+        month + 1,
+      ).padStart(2, "0")}-01`;
+
+const monthHolidays =
+  holidays.filter(
+    (h) =>
+      h.active &&
+      h.date.startsWith(monthPrefix),
   );
-  const away = requests.filter((r) => r.status === "approved");
+
+const away = requests.filter(
+  (r) =>
+    r.status === "approved" &&
+    r.endDate >= monthStart &&
+    r.startDate < nextMonthStart,
+);
 
   return (
     <>
