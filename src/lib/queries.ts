@@ -758,31 +758,36 @@ export async function getEmployeeOverview(
 export interface CalendarBirthday {
   id: string;
   name: string;
-  birthday: string;
+  monthDay: string;
 }
 
 /**
  * Active employee birthdays for the company calendar.
  *
  * Only exposes the minimum information needed by the calendar:
- * employee id, display name and birthday.
+ * employee id, display name and birthday month/day.
  */
 export async function getCalendarBirthdays(
   me: string,
 ): Promise<CalendarBirthday[]> {
-  const rows = await queryAs<Record<string, any>>(
+  const rows = await queryAs<{
+    employee_id: string;
+    employee_name: string;
+    birthday_md: string;
+  }>(
     me,
-    `select id, name, birthday::text as birthday
-       from users
-      where active = true
-        and birthday is not null
-      order by name`,
+    `select
+       employee_id,
+       employee_name,
+       birthday_md
+     from app.company_calendar_birthdays()
+     order by employee_name`,
   );
 
   return rows.map((r) => ({
-    id: r.id,
-    name: r.name,
-    birthday: r.birthday,
+    id: r.employee_id,
+    name: r.employee_name,
+    monthDay: r.birthday_md,
   }));
 }
 

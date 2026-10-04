@@ -107,17 +107,21 @@ export function MonthCalendar({
   return !isWeekend && !isHoliday;
 }
 
-  const birthdaysByDay = new Map<number, CalendarBirthday[]>();
+  const birthdaysByMonthDay =
+    new Map<string, CalendarBirthday[]>();
 
   for (const person of birthdays) {
-    const birthdayMonth = Number(person.birthday.slice(5, 7));
-    const birthdayDay = Number(person.birthday.slice(8, 10));
+    const list =
+      birthdaysByMonthDay.get(
+        person.monthDay,
+      ) ?? [];
 
-    if (birthdayMonth !== month) continue;
-
-    const list = birthdaysByDay.get(birthdayDay) ?? [];
     list.push(person);
-    birthdaysByDay.set(birthdayDay, list);
+
+    birthdaysByMonthDay.set(
+      person.monthDay,
+      list,
+    );
   }
 
   /*
@@ -312,9 +316,10 @@ const cells = monthGrid(year, month - 1);
             const entries =
               entriesByDate.get(date) ?? [];
 
-            const dayBirthdays = inMonth
-              ? birthdaysByDay.get(dt.getUTCDate()) ?? []
-              : [];
+            const dayBirthdays =
+              birthdaysByMonthDay.get(
+                date.slice(5, 10),
+              ) ?? [];
 
             const cls = [
               "cal-cell",
