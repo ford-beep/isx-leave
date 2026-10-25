@@ -2053,3 +2053,86 @@ table.tbl .actions { display: flex; gap: 6px; justify-content: flex-end; }
     height: 72px;
   }
 }
+
+/* =========================================================
+   Halloween Dashboard — preview
+   ========================================================= */
+
+.content:has(.dashboard-halloween) {
+  max-width: none;
+}
+
+.dashboard-halloween {
+  position: relative;
+  min-height: 100%;
+
+  margin: -24px -28px -56px;
+  padding: 24px 28px 56px;
+
+    background-color: #dddefd;
+
+  background-image: url("/seasonal/halloween/halloween-bg.png");
+  background-repeat: no-repeat;
+
+  background-size: auto 85%;
+  background-position: right 0 top 350px;
+}
+
+
+
+/* Greeting + White Ghost */
+.halloween-greeting-row {
+  display: flex;
+  align-items: center;
+  gap: 0px;
+}
+
+.halloween-greeting {
+  color: var(--c-ink);
+  margin: 0;
+}
+
+.halloween-greeting-ghost {
+  width: 100px;
+  height: 100px;
+  flex: 0 0 100px;
+
+  margin-top: -20px;
+  margin-bottom: -20px;
+
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Request leave button */
+.dashboard-halloween-request {
+  background: #f97316;
+  border-color: #f97316;
+  color: #111111;
+  font-weight: 650;
+}
+
+.dashboard-halloween-request:hover {
+  background: #ea580c;
+  border-color: #ea580c;
+  color: #111111;
+}
+
+.dashboard-halloween-request-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  object-fit: contain;
+}
+
+/* KPI progress bar */
+.dashboard-halloween .meter > span {
+  background: #f97316;
+}
+
+
+/* Weekly Plan W icon */
+.dashboard-halloween .dashboard-weekly-plan-icon {
+  color: #f97316;
+  background: #fff1e8;
+}

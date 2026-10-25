@@ -25,6 +25,7 @@ import { LeaveTable } from "@/components/LeaveTable";
 import { MonthCalendar } from "@/components/MonthCalendar";
 import { IconPlus } from "@/components/icons";
 import { ChristmasGingerbread } from "@/components/ChristmasGingerbread";
+import { HalloweenGhost } from "@/components/HalloweenGhost";
 import { PreHalloweenIntro } from "@/components/PreHalloweenIntro";
 
 export const dynamic = "force-dynamic";
@@ -115,10 +116,22 @@ getCompanyLeaveCalendarRange(
   const dashboardQuote = getDashboardQuote(today);
   const dashboardSeason = getDashboardSeason(today);
   const isChristmas = dashboardSeason === "christmas";
+  const isHalloweenPreview =
+  today >= "2026-10-26" &&
+  today <= "2026-10-31";
 
   return (
-  <div className={isChristmas ? "dashboard-christmas" : ""}>
+  <div
+  className={
+    isHalloweenPreview
+      ? "dashboard-halloween"
+      : isChristmas
+        ? "dashboard-christmas"
+        : ""
+  }
+>
     <PreHalloweenIntro today={today} />
+    
 
     {/* Christmas background decorations */}
       {isChristmas && (
@@ -162,21 +175,54 @@ getCompanyLeaveCalendarRange(
           </div>
         )}
 
-        {/* Greeting */}
-        <div className="page-head">
-          <div className="grow">
-            <h1>
-              {greeting()}, {me.name.split(" ")[0]}
-            </h1>
+{/* Greeting */}
+<div className="page-head">
+  <div className="grow">
+    <div
+      className={
+        isHalloweenPreview
+          ? "halloween-greeting-row"
+          : undefined
+      }
+    >
+      <h1
+        className={
+          isHalloweenPreview
+            ? "halloween-greeting"
+            : undefined
+        }
+      >
+        {greeting()}, {me.name.split(" ")[0]}
+      </h1>
 
-            <p className="muted">{dashboardQuote}</p>
-          </div>
+      {isHalloweenPreview && <HalloweenGhost />}
+    </div>
 
-          <Link href="/request" className="btn btn-primary">
-            <IconPlus size={16} />
-            Request leave
-          </Link>
-        </div>
+    <p className="muted">{dashboardQuote}</p>
+  </div>
+
+  <Link
+    href="/request"
+    className={
+      isHalloweenPreview
+        ? "btn dashboard-halloween-request"
+        : "btn btn-primary"
+    }
+  >
+    {isHalloweenPreview ? (
+      <img
+        src="/seasonal/halloween/pumpkin.svg"
+        alt=""
+        className="dashboard-halloween-request-icon"
+        aria-hidden="true"
+      />
+    ) : (
+      <IconPlus size={16} />
+    )}
+
+    Request leave
+  </Link>
+</div>
 
         {/* KPI */}
         <div className="kpis">
