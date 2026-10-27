@@ -6,6 +6,8 @@ import {
   WEEKDAY_NAMES,
 } from "@/lib/date";
 import {
+  canManageCalendarActivities,
+  getCalendarActivities,
   getCalendarBirthdays,
   getCompanyLeaveCalendarRange,
   getHolidaysInRange,
@@ -60,8 +62,15 @@ const visibleEnd =
     visibleDates.length - 1
   ]!;
 
-  const [office, holidays, companyLeaves, workSchedule, birthdays] =
-  await Promise.all([
+  const [
+    office,
+    holidays,
+    companyLeaves,
+    workSchedule,
+    activities,
+    canManageActivities,
+    birthdays,
+  ] = await Promise.all([
     getOfficeDays(me.id),
     getHolidaysInRange(
   me.id,
@@ -74,6 +83,8 @@ getCompanyLeaveCalendarRange(
   visibleEnd,
 ),
     getWorkSchedule(me.id, year, month),
+    getCalendarActivities(me.id, year, month),
+    canManageCalendarActivities(me.id),
     getCalendarBirthdays(me.id),
   ]);
 
@@ -111,6 +122,8 @@ const monthHolidays =
   holidays={holidays}
   requests={[]}
   companyLeaves={companyLeaves}
+  activities={activities}
+  canManageActivities={canManageActivities}
   birthdays={birthdays}
   mode="employee"
   basePath="/calendar"

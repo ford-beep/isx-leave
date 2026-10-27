@@ -7,6 +7,8 @@ import {
   WEEKDAY_NAMES,
 } from "@/lib/date";
 import {
+  canManageCalendarActivities,
+  getCalendarActivities,
   getCalendarBirthdays,
   getEmployeeOverview,
   getHolidaysInRange,
@@ -44,8 +46,16 @@ const visibleEnd =
   const employeeId =
     sp.employee && sp.employee !== "all" ? sp.employee : undefined;
 
-const [office, holidays, requests, employees, workSchedule, birthdays] =
-  await Promise.all([
+const [
+  office,
+  holidays,
+  requests,
+  employees,
+  workSchedule,
+  activities,
+  canManageActivities,
+  birthdays,
+] = await Promise.all([
     getOfficeDays(me.id),
     getHolidaysInRange(
   me.id,
@@ -60,6 +70,8 @@ getRequestsInRange(
 ),
     getEmployeeOverview(me.id, year),
     getWorkSchedule(me.id, year, month),
+    getCalendarActivities(me.id, year, month),
+    canManageCalendarActivities(me.id),
     getCalendarBirthdays(me.id),
   ]);
 
@@ -122,7 +134,9 @@ const away = requests.filter(
               officeWeekdays={office.weekdays}
               holidays={holidays}
               requests={requests}
-              birthdays={birthdays}
+              activities={activities}
+          canManageActivities={canManageActivities}
+          birthdays={birthdays}
               mode="admin"
               basePath="/admin/calendar"
               extraQuery={employeeId ? { employee: employeeId } : undefined}

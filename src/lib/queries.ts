@@ -1109,3 +1109,101 @@ export async function getTeamWeeklyPlan(
         : String(row.updated_at),
   }));
 }
+
+/* --------------------------------------------------- calendar activities */
+
+export interface CalendarActivity {
+  id: string;
+  date: string;
+  title: string;
+  startTime: string | null;
+  endTime: string | null;
+  location: string | null;
+  description: string | null;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function getCalendarActivities(
+  me: string,
+  year: number,
+  month: number,
+): Promise<CalendarActivity[]> {
+  const monthStart =
+    `${year}-${String(month).padStart(2, "0")}-01`;
+
+  const rows = await queryAs<{
+    id: string;
+    activity_date: string;
+    title: string;
+    start_time: string | null;
+    end_time: string | null;
+    location: string | null;
+    description: string | null;
+    created_by: string;
+    created_at: Date | string;
+    updated_at: Date | string;
+  }>(
+    me,
+    `
+      select
+        id,
+        activity_date::text as activity_date,
+        title,
+        case
+          when start_time is null then null
+          else to_char(start_time, 'HH24:MI')
+        end as start_time,
+        case
+          when end_time is null then null
+          else to_char(end_time, 'HH24:MI')
+        end as end_time,
+        location,
+        description,
+        created_by,
+        created_at,
+        updated_at
+      from calendar_activities
+      where activity_date >= ($1::date - interval '1 month')
+        and activity_date < ($1::date + interval '2 months')
+      order by
+        activity_date,
+        start_time nulls first,
+        created_at
+    `,
+    [monthStart],
+  );
+
+  return rows.map((row) => ({
+    id: row.id,
+    date: row.activity_date,
+    title: row.title,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    location: row.location,
+    description: row.description,
+    createdBy: row.created_by,
+    createdAt:
+      row.created_at instanceof Date
+        ? row.created_at.toISOString()
+        : String(row.created_at),
+    updatedAt:
+      row.updated_at instanceof Date
+        ? row.updated_at.toISOString()
+        : String(row.updated_at),
+  }));
+}
+
+export async function canManageCalendarActivities(
+  me: string,
+): Promise<boolean> {
+  const row = await oneAs<{ allowed: boolean }>(
+    me,
+    `
+      select app.can_manage_calendar_activities() as allowed
+    `,
+  );
+
+  return Boolean(row?.allowed);
+}
