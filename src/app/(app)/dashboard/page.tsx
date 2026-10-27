@@ -9,7 +9,9 @@ import {
 import { getDashboardQuote } from "@/lib/dashboardQuote";
 import { getDashboardSeason } from "@/lib/dashboardSeason";
 import {
+  canManageCalendarActivities,
   getBalance,
+  getCalendarActivities,
   getCalendarBirthdays,
   getCompanyLeaveCalendarRange,
   getHolidaysInRange,
@@ -92,6 +94,8 @@ const visibleEnd =
     holidays,
     companyLeaves,
     workSchedule,
+    activities,
+    canManageActivities,
     birthdays,
   ] = await Promise.all([
     getBalance(me.id, me.id, year),
@@ -110,6 +114,8 @@ getCompanyLeaveCalendarRange(
   visibleEnd,
 ),
     getWorkSchedule(me.id, calYear, calMonth),
+    getCalendarActivities(me.id, calYear, calMonth),
+    canManageCalendarActivities(me.id),
     getCalendarBirthdays(me.id),
   ]);
 
@@ -326,6 +332,8 @@ getCompanyLeaveCalendarRange(
                 holidays={holidays}
                 requests={[]}
                 companyLeaves={companyLeaves}
+                activities={activities}
+                canManageActivities={canManageActivities}
                 birthdays={birthdays}
                 mode="employee"
                 basePath="/dashboard"

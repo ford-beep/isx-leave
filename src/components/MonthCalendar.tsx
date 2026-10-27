@@ -9,11 +9,13 @@ import {
 } from "@/lib/date";
 import type { Holiday, LeaveRequest, WorkScheduleDay } from "@/lib/types";
 import type {
+  CalendarActivity,
   CalendarBirthday,
   CompanyCalendarLeave,
 } from "@/lib/queries";
 import { IconChevronLeft, IconChevronRight } from "./icons";
 import { ExpandableCalendarEntries } from "./ExpandableCalendarEntries";
+import { CalendarActivityCell } from "./CalendarActivityCell";
 
 export interface CalendarProps {
   year: number;
@@ -38,6 +40,9 @@ export interface CalendarProps {
    * on approved leave without exposing the full leave request.
    */
   companyLeaves?: CompanyCalendarLeave[];
+
+  activities?: CalendarActivity[];
+  canManageActivities?: boolean;
 
   birthdays: CalendarBirthday[];
 
@@ -74,6 +79,8 @@ export function MonthCalendar({
   holidays,
   requests,
   companyLeaves = [],
+  activities = [],
+  canManageActivities = false,
   birthdays,
   mode,
   basePath,
@@ -120,6 +127,21 @@ export function MonthCalendar({
 
     birthdaysByMonthDay.set(
       person.monthDay,
+      list,
+    );
+  }
+
+  const activitiesByDate =
+    new Map<string, CalendarActivity[]>();
+
+  for (const activity of activities) {
+    const list =
+      activitiesByDate.get(activity.date) ?? [];
+
+    list.push(activity);
+
+    activitiesByDate.set(
+      activity.date,
       list,
     );
   }
@@ -316,6 +338,9 @@ const cells = monthGrid(year, month - 1);
             const entries =
               entriesByDate.get(date) ?? [];
 
+            const dayActivities =
+              activitiesByDate.get(date) ?? [];
+
             const dayBirthdays =
               birthdaysByMonthDay.get(
                 date.slice(5, 10),
@@ -344,6 +369,13 @@ const cells = monthGrid(year, month - 1);
                 <div className="cal-num">
                   {dt.getUTCDate()}
                 </div>
+
+                <CalendarActivityCell
+                  date={date}
+                  activities={dayActivities}
+                  canManage={canManageActivities}
+                  inMonth={inMonth}
+                />
 
                 {!hol &&
                   isWorkingDay &&
